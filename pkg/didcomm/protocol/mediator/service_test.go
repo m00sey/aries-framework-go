@@ -728,6 +728,110 @@ func TestServiceForwardMsg(t *testing.T) {
 	})
 }
 
+type mockMsgPickupProvider struct {
+	provider
+	ValidateAddMessage func(message *model.Envelope, theirDID string) error
+	AddMessageErr      error
+}
+
+func (mpp *mockMsgPickupProvider) AddMessage(message *model.Envelope, theirDID string) error {
+	if mpp.AddMessageErr != nil {
+		return mpp.AddMessageErr
+	}
+
+	if mpp.ValidateAddMessage != nil {
+		return mpp.ValidateAddMessage(message, theirDID)
+	}
+
+	return nil
+}
+
+func TestMessagePickup(t *testing.T) {
+	t.Run("test service handle inbound message pick up - success", func(t *testing.T) {
+		to := randomID()
+
+		content := &model.Envelope{
+			Protected: "eyJ0eXAiOiJwcnMuaHlwZXJsZWRnZXIuYXJpZXMtYXV0aC1t" +
+				"ZXNzYWdlIiwiYWxnIjoiRUNESC1TUytYQzIwUEtXIiwiZW5jIjoiWEMyMFAifQ",
+			IV:         "JS2FxjEKdndnt-J7QX5pEnVwyBTu0_3d",
+			CipherText: "qQyzvajdvCDJbwxM",
+			Tag:        "2FqZMMQuNPYfL0JsSkj8LQ",
+		}
+
+		svc, err := New(&mockMsgPickupProvider{
+			provider: &mockprovider.Provider{
+				StorageProviderValue:          mockstore.NewMockStoreProvider(),
+				TransientStorageProviderValue: mockstore.NewMockStoreProvider(),
+				LegacyKMSValue:                &mockkms.CloseableKMS{},
+				OutboundDispatcherValue: &mockdispatcher.MockOutbound{
+					ValidateForward: func(_ interface{}, _ *service.Destination) error {
+						return errors.New("websocket connection failed")
+					},
+				},
+				VDRIRegistryValue: &mockvdri.MockVDRIRegistry{
+					ResolveFunc: func(didID string, opts ...vdri.ResolveOpts) (doc *did.Doc, e error) {
+						return mockdiddoc.GetMockDIDDoc(), nil
+					},
+				}},
+			ValidateAddMessage: func(message *model.Envelope, theirDID string) error {
+				require.Equal(t, content, message)
+				return nil
+			},
+		})
+		require.NoError(t, err)
+
+		err = svc.routeStore.Put(dataKey(to), []byte("did:example:123"))
+		require.NoError(t, err)
+
+		msgID := randomID()
+		msg := generateForwardMsgPayload(t, msgID, to, content)
+
+		err = svc.handleForward(msg)
+		require.NoError(t, err)
+	})
+
+	t.Run("test service handle inbound message pick up - add message error", func(t *testing.T) {
+		to := randomID()
+
+		content := &model.Envelope{
+			Protected: "eyJ0eXAiOiJwcnMuaHlwZXJsZWRnZXIuYXJpZXMtYXV0aC1t" +
+				"ZXNzYWdlIiwiYWxnIjoiRUNESC1TUytYQzIwUEtXIiwiZW5jIjoiWEMyMFAifQ",
+			IV:         "JS2FxjEKdndnt-J7QX5pEnVwyBTu0_3d",
+			CipherText: "qQyzvajdvCDJbwxM",
+			Tag:        "2FqZMMQuNPYfL0JsSkj8LQ",
+		}
+
+		svc, err := New(&mockMsgPickupProvider{
+			provider: &mockprovider.Provider{
+				StorageProviderValue:          mockstore.NewMockStoreProvider(),
+				TransientStorageProviderValue: mockstore.NewMockStoreProvider(),
+				LegacyKMSValue:                &mockkms.CloseableKMS{},
+				OutboundDispatcherValue: &mockdispatcher.MockOutbound{
+					ValidateForward: func(_ interface{}, _ *service.Destination) error {
+						return errors.New("websocket connection failed")
+					},
+				},
+				VDRIRegistryValue: &mockvdri.MockVDRIRegistry{
+					ResolveFunc: func(didID string, opts ...vdri.ResolveOpts) (doc *did.Doc, e error) {
+						return mockdiddoc.GetMockDIDDoc(), nil
+					},
+				}},
+			AddMessageErr: errors.New("add error"),
+		})
+		require.NoError(t, err)
+
+		err = svc.routeStore.Put(dataKey(to), []byte("did:example:123"))
+		require.NoError(t, err)
+
+		msgID := randomID()
+		msg := generateForwardMsgPayload(t, msgID, to, content)
+
+		err = svc.handleForward(msg)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "add error")
+	})
+}
+
 func TestRegister(t *testing.T) {
 	t.Run("test register route - success", func(t *testing.T) {
 		msgID := make(chan string)

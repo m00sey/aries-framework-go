@@ -121,6 +121,10 @@ type connections interface {
 	GetConnectionRecord(string) (*connection.Record, error)
 }
 
+type messagepickup interface {
+	AddMessage(message *model.Envelope, theirDID string) error
+}
+
 // Service for Route Coordination protocol.
 // https://github.com/hyperledger/aries-rfcs/tree/master/features/0211-route-coordination
 type Service struct {
@@ -137,6 +141,7 @@ type Service struct {
 	keylistUpdateMap         map[string]chan *KeylistUpdateResponse
 	keylistUpdateMapLock     sync.RWMutex
 	callbacks                chan *callback
+	messageStore             messagepickup
 }
 
 // New return route coordination service.
@@ -151,6 +156,12 @@ func New(prov provider) (*Service, error) {
 		return nil, err
 	}
 
+	// messagepickup won't be initialized every time this means mp could be nil and should be checked before access
+	mp, ok := prov.(messagepickup)
+	if !ok {
+		logger.Warnf("messagepickup not configured")
+	}
+
 	s := &Service{
 		routeStore:           store,
 		outbound:             prov.OutboundDispatcher(),
@@ -161,6 +172,7 @@ func New(prov provider) (*Service, error) {
 		routeRegistrationMap: make(map[string]chan Grant),
 		keylistUpdateMap:     make(map[string]chan *KeylistUpdateResponse),
 		callbacks:            make(chan *callback),
+		messageStore:         mp,
 	}
 
 	go s.listenForCallbacks()
@@ -486,7 +498,12 @@ func (s *Service) handleForward(msg service.DIDCommMsg) error {
 		return fmt.Errorf("get destination : %w", err)
 	}
 
-	return s.outbound.Forward(forward.Msg, dest)
+	err = s.outbound.Forward(forward.Msg, dest)
+	if err != nil && s.messageStore != nil {
+		return s.messageStore.AddMessage(forward.Msg, string(theirDID))
+	}
+
+	return err
 }
 
 // Register registers the agent with the router on the other end of the connection identified by
