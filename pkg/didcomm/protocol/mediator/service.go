@@ -20,6 +20,7 @@ import (
 	"github.com/hyperledger/aries-framework-go/pkg/didcomm/common/service"
 	"github.com/hyperledger/aries-framework-go/pkg/didcomm/dispatcher"
 	"github.com/hyperledger/aries-framework-go/pkg/didcomm/protocol/decorator"
+	"github.com/hyperledger/aries-framework-go/pkg/didcomm/protocol/messagepickup"
 	"github.com/hyperledger/aries-framework-go/pkg/framework/aries/api/vdri"
 	"github.com/hyperledger/aries-framework-go/pkg/internal/logutil"
 	"github.com/hyperledger/aries-framework-go/pkg/kms/legacykms"
@@ -92,6 +93,7 @@ type provider interface {
 	RouterEndpoint() string
 	LegacyKMS() legacykms.KeyManager
 	VDRIRegistry() vdri.Registry
+	Service(id string) (interface{}, error)
 }
 
 // ClientOption configures the route client
@@ -121,10 +123,6 @@ type connections interface {
 	GetConnectionRecord(string) (*connection.Record, error)
 }
 
-type messagepickup interface {
-	AddMessage(message *model.Envelope, theirDID string) error
-}
-
 // Service for Route Coordination protocol.
 // https://github.com/hyperledger/aries-rfcs/tree/master/features/0211-route-coordination
 type Service struct {
@@ -141,7 +139,7 @@ type Service struct {
 	keylistUpdateMap         map[string]chan *KeylistUpdateResponse
 	keylistUpdateMapLock     sync.RWMutex
 	callbacks                chan *callback
-	messageStore             messagepickup
+	messagePickupSvc         messagepickup.ProtocolService
 }
 
 // New return route coordination service.
@@ -156,10 +154,14 @@ func New(prov provider) (*Service, error) {
 		return nil, err
 	}
 
-	// messagepickup won't be initialized every time this means mp could be nil and should be checked before access
-	mp, ok := prov.(messagepickup)
+	mp, err := prov.Service(messagepickup.MessagePickup)
+	if err != nil {
+		return nil, err
+	}
+
+	messagePickupSvc, ok := mp.(messagepickup.ProtocolService)
 	if !ok {
-		logger.Warnf("messagepickup not configured")
+		return nil, errors.New("cast service to message pickup service failed")
 	}
 
 	s := &Service{
@@ -172,7 +174,7 @@ func New(prov provider) (*Service, error) {
 		routeRegistrationMap: make(map[string]chan Grant),
 		keylistUpdateMap:     make(map[string]chan *KeylistUpdateResponse),
 		callbacks:            make(chan *callback),
-		messageStore:         mp,
+		messagePickupSvc:     messagePickupSvc,
 	}
 
 	go s.listenForCallbacks()
@@ -499,8 +501,8 @@ func (s *Service) handleForward(msg service.DIDCommMsg) error {
 	}
 
 	err = s.outbound.Forward(forward.Msg, dest)
-	if err != nil && s.messageStore != nil {
-		return s.messageStore.AddMessage(forward.Msg, string(theirDID))
+	if err != nil && s.messagePickupSvc != nil {
+		return s.messagePickupSvc.AddMessage(forward.Msg, string(theirDID))
 	}
 
 	return err
