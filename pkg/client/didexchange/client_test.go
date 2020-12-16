@@ -1153,10 +1153,11 @@ func TestServiceEvents(t *testing.T) {
 			Thread: &decorator.Thread{
 				PID: invitation.ID,
 			},
-			Connection: &didexchange.Connection{
-				DID:    doc.DIDDocument.ID,
-				DIDDoc: doc.DIDDocument,
-			},
+			DIDDoc: decorator.Attachment{},
+			// Connection: &didexchange.Connection{
+			// 	DID:    doc.DIDDocument.ID,
+			// 	DIDDoc: doc.DIDDocument,
+			// },
 		},
 	)
 	require.NoError(t, err)
@@ -1255,10 +1256,11 @@ func TestAcceptExchangeRequest(t *testing.T) {
 			Thread: &decorator.Thread{
 				PID: invitation.ID,
 			},
-			Connection: &didexchange.Connection{
-				DID:    doc.DIDDocument.ID,
-				DIDDoc: doc.DIDDocument,
-			},
+			DIDDoc: decorator.Attachment{},
+			// Connection: &didexchange.Connection{
+			// 	DID:    doc.DIDDocument.ID,
+			// 	DIDDoc: doc.DIDDocument,
+			// },
 		},
 	)
 	require.NoError(t, err)

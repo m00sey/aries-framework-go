@@ -32,6 +32,7 @@ import (
 	"github.com/hyperledger/aries-framework-go/pkg/kms/localkms"
 	"github.com/hyperledger/aries-framework-go/pkg/storage"
 	connectionstore "github.com/hyperledger/aries-framework-go/pkg/store/connection"
+	"github.com/hyperledger/aries-framework-go/pkg/vdr/fingerprint"
 )
 
 const (
@@ -307,16 +308,11 @@ func (ctx *context) handleInboundOOBInvitation(
 		return nil, nil, fmt.Errorf("failed to decode oob invitation: %w", err)
 	}
 
-	myDID, err := did.Parse(didDoc.ID)
-	if err != nil {
-		return nil, nil, err
-	}
-
 	request := &Request{
 		Type:  RequestMsgType,
 		ID:    thid,
 		Label: oobInvitation.MyLabel,
-		DID:   myDID.String(),
+		DID:   didDoc.ID,
 		Thread: &decorator.Thread{
 			ID:  thid,
 			PID: msg.connRecord.ParentThreadID,
@@ -364,11 +360,6 @@ func (ctx *context) handleInboundInvitation(invitation *Invitation, thid string,
 		pid = invitation.DID
 	}
 
-	did, err := did.Parse(didDoc.ID)
-	if err != nil {
-		return nil, nil, err
-	}
-
 	didDocBytes, err := json.Marshal(didDoc)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to marshal didDoc: %w", err)
@@ -383,10 +374,13 @@ func (ctx *context) handleInboundInvitation(invitation *Invitation, thid string,
 		Type:  RequestMsgType,
 		ID:    thid,
 		Label: getLabel(options),
-		DID:   did.String(),
-		DIDDoc: decorator.AttachmentData{
-			Base64: base64.RawStdEncoding.EncodeToString(didDocBytes),
-			JWS:    jws,
+		DID:   didDoc.ID,
+		DIDDoc: decorator.Attachment{
+			MimeType: "application/json",
+			Data: decorator.AttachmentData{
+				Base64: base64.RawStdEncoding.EncodeToString(didDocBytes),
+				JWS:    jws,
+			},
 		},
 		Thread: &decorator.Thread{
 			PID: pid,
@@ -406,7 +400,7 @@ func (ctx *context) handleInboundInvitation(invitation *Invitation, thid string,
 
 func (ctx *context) handleInboundRequest(request *Request, options *options,
 	connRec *connectionstore.Record) (stateAction, *connectionstore.Record, error) {
-	requestDidDoc, err := ctx.resolveDidDocFromAttachment(request.DIDDoc)
+	requestDidDoc, err := ctx.resolveDidDocFromAttachment(request.DIDDoc.Data)
 	if err != nil {
 		return nil, nil, fmt.Errorf("resolve did doc from exchange request connection: %w", err)
 	}
@@ -414,11 +408,6 @@ func (ctx *context) handleInboundRequest(request *Request, options *options,
 	// get did document that will be used in exchange response
 	// (my did doc)
 	responseDidDoc, err := ctx.getDIDDoc(getPublicDID(options), getRouterConnections(options))
-	if err != nil {
-		return nil, nil, err
-	}
-
-	myDID, err := did.Parse(responseDidDoc.ID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -440,15 +429,18 @@ func (ctx *context) handleInboundRequest(request *Request, options *options,
 		Thread: &decorator.Thread{
 			ID: request.ID,
 		},
-		DID: myDID.String(),
-		DIDDoc: decorator.AttachmentData{
-			Base64: base64.RawStdEncoding.EncodeToString(responseDidDocBytes),
-			JWS:    jws,
+		DID: responseDidDoc.ID,
+		DIDDoc: decorator.Attachment{
+			MimeType: "application/json",
+			Data: decorator.AttachmentData{
+				Base64: base64.RawStdEncoding.EncodeToString(responseDidDocBytes),
+				JWS:    jws,
+			},
 		},
 	}
 
 	connRec.TheirDID = requestDidDoc.ID
-	connRec.MyDID = myDID.String()
+	connRec.MyDID = responseDidDoc.ID
 	connRec.TheirLabel = request.Label
 
 	destination, err := service.CreateDestination(requestDidDoc)
@@ -634,8 +626,10 @@ func (ctx *context) prepareJWS(didDocBytes []byte,
 		return nil, fmt.Errorf("prepareJWS: failed to get key handle: %w", err)
 	}
 
+	didKey, _ := fingerprint.CreateDIDKey(base58.Decode(pubKey))
+
 	headers := map[string]interface{}{
-		jose.HeaderKeyID: signingKID,
+		jose.HeaderKeyID: didKey,
 	}
 
 	// todo - 626 where to derive Algo from
@@ -658,7 +652,8 @@ func (ctx *context) prepareJWS(didDocBytes []byte,
 	}
 
 	return &jwsResponse{
-		Header:    headers,
+		Header: headers,
+		// TODO change these to URLEncoding?
 		Protected: base64.StdEncoding.EncodeToString(protectedHeaderBytes),
 		Signature: base64.StdEncoding.EncodeToString(jws.Signature()),
 	}, nil
@@ -684,7 +679,7 @@ func (ctx *context) handleInboundResponse(response *Response) (stateAction, *con
 		return nil, nil, fmt.Errorf("get connection record: %w", err)
 	}
 
-	data, err := response.DIDDoc.Fetch()
+	data, err := response.DIDDoc.Data.Fetch()
 
 	jws := &jwsResponse{}
 	err = json.Unmarshal(data, jws)
@@ -692,12 +687,12 @@ func (ctx *context) handleInboundResponse(response *Response) (stateAction, *con
 		return nil, nil, err
 	}
 
-	err = verifyJWS(response.DIDDoc.Base64, jws, connRecord.RecipientKeys[0])
+	err = verifyJWS(response.DIDDoc.Data.Base64, jws, connRecord.RecipientKeys[0])
 	if err != nil {
 		return nil, nil, err
 	}
 
-	responseDidDoc, err := ctx.resolveDidDocFromAttachment(response.DIDDoc)
+	responseDidDoc, err := ctx.resolveDidDocFromAttachment(response.DIDDoc.Data)
 	if err != nil {
 		return nil, nil, fmt.Errorf("resolve did doc from exchange response connection: %w", err)
 	}

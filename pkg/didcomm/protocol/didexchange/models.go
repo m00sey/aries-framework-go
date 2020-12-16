@@ -68,20 +68,20 @@ type Invitation struct {
 // Request defines a2a DID exchange request
 // https://github.com/hyperledger/aries-rfcs/tree/master/features/0023-did-exchange#1-exchange-request
 type Request struct {
-	Type   string                   `json:"@type,omitempty"`
-	ID     string                   `json:"@id,omitempty"`
-	Label  string                   `json:"label,omitempty"`
-	DID    string                   `json:"did,omitempty"`
-	DIDDoc decorator.AttachmentData `json:"did_doc~attach,omitempty"`
-	Thread *decorator.Thread        `json:"~thread,omitempty"`
+	Type   string               `json:"@type,omitempty"`
+	ID     string               `json:"@id,omitempty"`
+	Label  string               `json:"label,omitempty"`
+	DID    string               `json:"did,omitempty"`
+	DIDDoc decorator.Attachment `json:"did_doc~attach,omitempty"`
+	Thread *decorator.Thread    `json:"~thread,omitempty"`
 }
 
 // Response defines a2a DID exchange response
 // https://github.com/hyperledger/aries-rfcs/tree/master/features/0023-did-exchange#2-exchange-response
 type Response struct {
-	Type   string                   `json:"@type,omitempty"`
-	ID     string                   `json:"@id,omitempty"`
-	DID    string                   `json:"did,omitempty"`
-	DIDDoc decorator.AttachmentData `json:"did_doc~attach,omitempty"`
-	Thread *decorator.Thread        `json:"~thread,omitempty"`
+	Type   string               `json:"@type,omitempty"`
+	ID     string               `json:"@id,omitempty"`
+	DID    string               `json:"did,omitempty"`
+	DIDDoc decorator.Attachment `json:"did_doc~attach,omitempty"`
+	Thread *decorator.Thread    `json:"~thread,omitempty"`
 }
