@@ -720,7 +720,7 @@ func (s *Service) requestMsgRecord(msg service.DIDCommMsg) (*connection.Record, 
 		ConnectionID: generateRandomID(),
 		ThreadID:     request.ID,
 		State:        stateNameNull,
-		TheirDID:     request.Connection.DID,
+		TheirDID:     request.DID,
 		InvitationID: invitationID,
 		Namespace:    theirNSPrefix,
 	}

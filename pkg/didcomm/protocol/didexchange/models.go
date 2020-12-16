@@ -8,7 +8,6 @@ package didexchange
 
 import (
 	"github.com/hyperledger/aries-framework-go/pkg/didcomm/protocol/decorator"
-	"github.com/hyperledger/aries-framework-go/pkg/doc/did"
 )
 
 // OOBInvitation to connect with did-exchange.
@@ -69,32 +68,20 @@ type Invitation struct {
 // Request defines a2a DID exchange request
 // https://github.com/hyperledger/aries-rfcs/tree/master/features/0023-did-exchange#1-exchange-request
 type Request struct {
-	Type       string            `json:"@type,omitempty"`
-	ID         string            `json:"@id,omitempty"`
-	Label      string            `json:"label,omitempty"`
-	Connection *Connection       `json:"connection,omitempty"`
-	Thread     *decorator.Thread `json:"~thread,omitempty"`
+	Type   string                   `json:"@type,omitempty"`
+	ID     string                   `json:"@id,omitempty"`
+	Label  string                   `json:"label,omitempty"`
+	DID    string                   `json:"did,omitempty"`
+	DIDDoc decorator.AttachmentData `json:"did_doc~attach,omitempty"`
+	Thread *decorator.Thread        `json:"~thread,omitempty"`
 }
 
 // Response defines a2a DID exchange response
 // https://github.com/hyperledger/aries-rfcs/tree/master/features/0023-did-exchange#2-exchange-response
 type Response struct {
-	Type                string               `json:"@type,omitempty"`
-	ID                  string               `json:"@id,omitempty"`
-	ConnectionSignature *ConnectionSignature `json:"connection~sig,omitempty"`
-	Thread              *decorator.Thread    `json:"~thread,omitempty"`
-}
-
-// ConnectionSignature connection signature.
-type ConnectionSignature struct {
-	Type       string `json:"@type,omitempty"`
-	Signature  string `json:"signature,omitempty"`
-	SignedData string `json:"sig_data,omitempty"`
-	SignVerKey string `json:"signers,omitempty"`
-}
-
-// Connection connection.
-type Connection struct {
-	DID    string   `json:"did,omitempty"`
-	DIDDoc *did.Doc `json:"did_doc,omitempty"`
+	Type   string                   `json:"@type,omitempty"`
+	ID     string                   `json:"@id,omitempty"`
+	DID    string                   `json:"did,omitempty"`
+	DIDDoc decorator.AttachmentData `json:"did_doc~attach,omitempty"`
+	Thread *decorator.Thread        `json:"~thread,omitempty"`
 }

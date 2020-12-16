@@ -8,31 +8,30 @@ package didexchange
 
 import (
 	"encoding/base64"
-	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/btcsuite/btcutil/base58"
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 
+	ariescrypto "github.com/hyperledger/aries-framework-go/pkg/crypto"
 	"github.com/hyperledger/aries-framework-go/pkg/didcomm/common/model"
 	"github.com/hyperledger/aries-framework-go/pkg/didcomm/common/service"
 	"github.com/hyperledger/aries-framework-go/pkg/didcomm/protocol/decorator"
 	"github.com/hyperledger/aries-framework-go/pkg/didcomm/protocol/mediator"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/did"
+	"github.com/hyperledger/aries-framework-go/pkg/doc/jose"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/signature/suite"
-	"github.com/hyperledger/aries-framework-go/pkg/doc/signature/suite/ed25519signature2018"
+	"github.com/hyperledger/aries-framework-go/pkg/doc/signature/suite/jsonwebsignature2020"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/signature/verifier"
 	vdrapi "github.com/hyperledger/aries-framework-go/pkg/framework/aries/api/vdr"
 	"github.com/hyperledger/aries-framework-go/pkg/kms"
 	"github.com/hyperledger/aries-framework-go/pkg/kms/localkms"
 	"github.com/hyperledger/aries-framework-go/pkg/storage"
 	connectionstore "github.com/hyperledger/aries-framework-go/pkg/store/connection"
-	"github.com/hyperledger/aries-framework-go/pkg/vdr"
 )
 
 const (
@@ -111,8 +110,7 @@ func stateFromName(name string) (state, error) {
 	}
 }
 
-type noOp struct {
-}
+type noOp struct{}
 
 func (s *noOp) Name() string {
 	return stateNameNoop
@@ -128,8 +126,7 @@ func (s *noOp) ExecuteInbound(_ *stateMachineMsg, thid string, ctx *context) (*c
 }
 
 // null state.
-type null struct {
-}
+type null struct{}
 
 func (s *null) Name() string {
 	return stateNameNull
@@ -145,8 +142,7 @@ func (s *null) ExecuteInbound(msg *stateMachineMsg, thid string, ctx *context) (
 }
 
 // invited state.
-type invited struct {
-}
+type invited struct{}
 
 func (s *invited) Name() string {
 	return StateIDInvited
@@ -166,8 +162,7 @@ func (s *invited) ExecuteInbound(msg *stateMachineMsg, _ string, _ *context) (*c
 }
 
 // requested state.
-type requested struct {
-}
+type requested struct{}
 
 func (s *requested) Name() string {
 	return StateIDRequested
@@ -209,8 +204,7 @@ func (s *requested) ExecuteInbound(msg *stateMachineMsg, thid string, ctx *conte
 }
 
 // responded state.
-type responded struct {
-}
+type responded struct{}
 
 func (s *responded) Name() string {
 	return StateIDResponded
@@ -245,8 +239,7 @@ func (s *responded) ExecuteInbound(msg *stateMachineMsg, thid string, ctx *conte
 }
 
 // completed state.
-type completed struct {
-}
+type completed struct{}
 
 func (s *completed) Name() string {
 	return StateIDCompleted
@@ -282,8 +275,7 @@ func (s *completed) ExecuteInbound(msg *stateMachineMsg, thid string, ctx *conte
 }
 
 // abandoned state.
-type abandoned struct {
-}
+type abandoned struct{}
 
 func (s *abandoned) Name() string {
 	return StateIDAbandoned
@@ -300,12 +292,12 @@ func (s *abandoned) ExecuteInbound(msg *stateMachineMsg, thid string, ctx *conte
 
 func (ctx *context) handleInboundOOBInvitation(
 	msg *stateMachineMsg, thid string, options *options) (stateAction, *connectionstore.Record, error) {
-	myDID, conn, err := ctx.getDIDDocAndConnection(getPublicDID(options), getRouterConnections(options))
+	didDoc, err := ctx.getDIDDoc(getPublicDID(options), getRouterConnections(options))
 	if err != nil {
 		return nil, nil, fmt.Errorf("handleInboundOOBInvitation - failed to get diddoc and connection: %w", err)
 	}
 
-	msg.connRecord.MyDID = myDID.ID
+	msg.connRecord.MyDID = didDoc.ID
 	msg.connRecord.ThreadID = thid
 
 	oobInvitation := OOBInvitation{}
@@ -315,11 +307,16 @@ func (ctx *context) handleInboundOOBInvitation(
 		return nil, nil, fmt.Errorf("failed to decode oob invitation: %w", err)
 	}
 
+	myDID, err := did.Parse(didDoc.ID)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	request := &Request{
-		Type:       RequestMsgType,
-		ID:         thid,
-		Label:      oobInvitation.MyLabel,
-		Connection: conn,
+		Type:  RequestMsgType,
+		ID:    thid,
+		Label: oobInvitation.MyLabel,
+		DID:   myDID.String(),
 		Thread: &decorator.Thread{
 			ID:  thid,
 			PID: msg.connRecord.ParentThreadID,
@@ -337,7 +334,7 @@ func (ctx *context) handleInboundOOBInvitation(
 		RoutingKeys:     svc.RoutingKeys,
 	}
 
-	recipientKey, err := recipientKey(myDID)
+	recipientKey, err := recipientKey(didDoc)
 	if err != nil {
 		return nil, nil, fmt.Errorf("handle inbound OOBInvitation: %w", err)
 	}
@@ -357,7 +354,7 @@ func (ctx *context) handleInboundInvitation(invitation *Invitation, thid string,
 	}
 
 	// get did document that will be used in exchange request
-	didDoc, conn, err := ctx.getDIDDocAndConnection(getPublicDID(options), getRouterConnections(options))
+	didDoc, err := ctx.getDIDDoc(getPublicDID(options), getRouterConnections(options))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -367,16 +364,35 @@ func (ctx *context) handleInboundInvitation(invitation *Invitation, thid string,
 		pid = invitation.DID
 	}
 
+	did, err := did.Parse(didDoc.ID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	didDocBytes, err := json.Marshal(didDoc)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to marshal didDoc: %w", err)
+	}
+
+	jws, err := ctx.prepareJWS(didDocBytes, pid)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	request := &Request{
-		Type:       RequestMsgType,
-		ID:         thid,
-		Label:      getLabel(options),
-		Connection: conn,
+		Type:  RequestMsgType,
+		ID:    thid,
+		Label: getLabel(options),
+		DID:   did.String(),
+		DIDDoc: decorator.AttachmentData{
+			Base64: base64.RawStdEncoding.EncodeToString(didDocBytes),
+			JWS:    jws,
+		},
 		Thread: &decorator.Thread{
 			PID: pid,
 		},
 	}
-	connRec.MyDID = request.Connection.DID
+	connRec.MyDID = request.DID
 
 	senderKey, err := recipientKey(didDoc)
 	if err != nil {
@@ -390,20 +406,29 @@ func (ctx *context) handleInboundInvitation(invitation *Invitation, thid string,
 
 func (ctx *context) handleInboundRequest(request *Request, options *options,
 	connRec *connectionstore.Record) (stateAction, *connectionstore.Record, error) {
-	requestDidDoc, err := ctx.resolveDidDocFromConnection(request.Connection)
+	requestDidDoc, err := ctx.resolveDidDocFromAttachment(request.DIDDoc)
 	if err != nil {
 		return nil, nil, fmt.Errorf("resolve did doc from exchange request connection: %w", err)
 	}
 
 	// get did document that will be used in exchange response
 	// (my did doc)
-	responseDidDoc, connection, err := ctx.getDIDDocAndConnection(getPublicDID(options), getRouterConnections(options))
+	responseDidDoc, err := ctx.getDIDDoc(getPublicDID(options), getRouterConnections(options))
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// prepare connection signature
-	encodedConnectionSignature, err := ctx.prepareConnectionSignature(connection, request.Thread.PID)
+	myDID, err := did.Parse(responseDidDoc.ID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	responseDidDocBytes, err := responseDidDoc.JSONBytes()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	jws, err := ctx.prepareJWS(responseDidDocBytes, request.Thread.PID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -415,11 +440,15 @@ func (ctx *context) handleInboundRequest(request *Request, options *options,
 		Thread: &decorator.Thread{
 			ID: request.ID,
 		},
-		ConnectionSignature: encodedConnectionSignature,
+		DID: myDID.String(),
+		DIDDoc: decorator.AttachmentData{
+			Base64: base64.RawStdEncoding.EncodeToString(responseDidDocBytes),
+			JWS:    jws,
+		},
 	}
 
-	connRec.TheirDID = request.Connection.DID
-	connRec.MyDID = connection.DID
+	connRec.TheirDID = requestDidDoc.ID
+	connRec.MyDID = myDID.String()
 	connRec.TheirLabel = request.Label
 
 	destination, err := service.CreateDestination(requestDidDoc)
@@ -476,21 +505,21 @@ func (ctx *context) getDestination(invitation *Invitation) (*service.Destination
 }
 
 // nolint: funlen,gocyclo
-func (ctx *context) getDIDDocAndConnection(pubDID string, routerConnections []string) (*did.Doc, *Connection, error) {
+func (ctx *context) getDIDDoc(pubDID string, routerConnections []string) (*did.Doc, error) {
 	if pubDID != "" {
 		logger.Debugf("using public did[%s] for connection", pubDID)
 
 		docResolution, err := ctx.vdRegistry.Resolve(pubDID)
 		if err != nil {
-			return nil, nil, fmt.Errorf("resolve public did[%s]: %w", pubDID, err)
+			return nil, fmt.Errorf("resolve public did[%s]: %w", pubDID, err)
 		}
 
 		err = ctx.connectionStore.SaveDIDFromDoc(docResolution.DIDDocument)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 
-		return docResolution.DIDDocument, &Connection{DID: docResolution.DIDDocument.ID}, nil
+		return docResolution.DIDDocument, nil
 	}
 
 	logger.Debugf("creating new '%s' did for connection", didMethod)
@@ -501,7 +530,7 @@ func (ctx *context) getDIDDocAndConnection(pubDID string, routerConnections []st
 		// get the route configs (pass empty service endpoint, as default service endpoint added in VDR)
 		serviceEndpoint, routingKeys, err := mediator.GetRouterConfig(ctx.routeSvc, connID, "")
 		if err != nil {
-			return nil, nil, fmt.Errorf("did doc - fetch router config: %w", err)
+			return nil, fmt.Errorf("did doc - fetch router config: %w", err)
 		}
 
 		services = append(services, did.Service{ServiceEndpoint: serviceEndpoint, RoutingKeys: routingKeys})
@@ -516,7 +545,7 @@ func (ctx *context) getDIDDocAndConnection(pubDID string, routerConnections []st
 		didMethod, &did.Doc{Service: services},
 	)
 	if err != nil {
-		return nil, nil, fmt.Errorf("create %s did: %w", didMethod, err)
+		return nil, fmt.Errorf("create %s did: %w", didMethod, err)
 	}
 
 	if len(routerConnections) != 0 {
@@ -527,7 +556,7 @@ func (ctx *context) getDIDDocAndConnection(pubDID string, routerConnections []st
 					// TODO https://github.com/hyperledger/aries-framework-go/issues/1105 Support to Add multiple
 					//  recKeys to the Router
 					if err = mediator.AddKeyToRouter(ctx.routeSvc, connID, recKey); err != nil {
-						return nil, nil, fmt.Errorf("did doc - add key to the router: %w", err)
+						return nil, fmt.Errorf("did doc - add key to the router: %w", err)
 					}
 				}
 			}
@@ -536,32 +565,21 @@ func (ctx *context) getDIDDocAndConnection(pubDID string, routerConnections []st
 
 	err = ctx.connectionStore.SaveDIDFromDoc(docResolution.DIDDocument)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	connection := &Connection{
-		DID:    docResolution.DIDDocument.ID,
-		DIDDoc: docResolution.DIDDocument,
-	}
-
-	return docResolution.DIDDocument, connection, nil
+	return docResolution.DIDDocument, nil
 }
 
-func (ctx *context) resolveDidDocFromConnection(conn *Connection) (*did.Doc, error) {
-	didDoc := conn.DIDDoc
-	if didDoc == nil {
-		// did content was not provided; resolve
-		docResolution, err := ctx.vdRegistry.Resolve(conn.DID)
-		if err != nil {
-			return nil, err
-		}
-
-		return docResolution.DIDDocument, err
+func (ctx *context) resolveDidDocFromAttachment(attach decorator.AttachmentData) (*did.Doc, error) {
+	d, err := attach.Fetch()
+	if err != nil {
+		return nil, fmt.Errorf("extracting did_doc~attach data failed: %s", err)
 	}
 
-	didMethod, err := vdr.GetDidMethod(didDoc.ID)
+	didDoc, err := did.ParseDocument(d)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unmarshalling did_doc failed: %s", err)
 	}
 
 	// store provided did document
@@ -573,21 +591,33 @@ func (ctx *context) resolveDidDocFromConnection(conn *Connection) (*did.Doc, err
 	return didDoc, nil
 }
 
-// Encode the connection and convert to Connection Signature as per the spec:
+type jwsSigner struct {
+	keyHandle interface{}
+	crypto    ariescrypto.Crypto
+	headers   map[string]interface{}
+}
+
+// Headers to match jose Signer interface
+func (s jwsSigner) Headers() jose.Headers {
+	return s.headers
+}
+
+// Sign to match jose Signer interface
+func (s jwsSigner) Sign(data []byte) ([]byte, error) {
+	return s.crypto.Sign(data, s.keyHandle)
+}
+
+type jwsResponse struct {
+	Header    map[string]interface{} `json:"header"`
+	Protected string                 `json:"protected"`
+	Signature string                 `json:"signature"`
+}
+
+// Encode the message and convert to Signed Attachment as per the spec:
 // https://github.com/hyperledger/aries-rfcs/tree/master/features/0023-did-exchange
-func (ctx *context) prepareConnectionSignature(connection *Connection,
-	invitationID string) (*ConnectionSignature, error) {
-	logger.Debugf("connection=%+v invitationID=%s", connection, invitationID)
-
-	connAttributeBytes, err := json.Marshal(connection)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal connection: %w", err)
-	}
-
-	now := getEpochTime()
-	timestampBuf := make([]byte, timestamplen)
-	binary.BigEndian.PutUint64(timestampBuf, uint64(now))
-	concatenateSignData := append(timestampBuf, connAttributeBytes...)
+func (ctx *context) prepareJWS(didDocBytes []byte,
+	invitationID string) (*jwsResponse, error) {
+	logger.Debugf("invitationID=%s", invitationID)
 
 	pubKey, err := ctx.getVerKey(invitationID)
 	if err != nil {
@@ -596,25 +626,41 @@ func (ctx *context) prepareConnectionSignature(connection *Connection,
 
 	signingKID, err := localkms.CreateKID(base58.Decode(pubKey), kms.ED25519Type)
 	if err != nil {
-		return nil, fmt.Errorf("prepareConnectionSignature: failed to generate KID from public key: %w", err)
+		return nil, fmt.Errorf("prepare	WS: failed to generate KID from public key: %w", err)
 	}
 
 	kh, err := ctx.kms.Get(signingKID)
 	if err != nil {
-		return nil, fmt.Errorf("prepareConnectionSignature: failed to get key handle: %w", err)
+		return nil, fmt.Errorf("prepareJWS: failed to get key handle: %w", err)
 	}
 
-	// TODO: Replace with signed attachments issue-626
-	signature, err := ctx.crypto.Sign(concatenateSignData, kh)
+	headers := map[string]interface{}{
+		jose.HeaderKeyID: signingKID,
+	}
+
+	// todo - 626 where to derive Algo from
+	protectedHeaders := map[string]interface{}{
+		jose.HeaderAlgorithm: "EdDSA",
+	}
+
+	jws, err := jose.NewJWS(headers, protectedHeaders, didDocBytes, jwsSigner{
+		keyHandle: kh,
+		crypto:    ctx.crypto,
+		headers:   protectedHeaders,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("sign response message: %w", err)
+		return nil, err
 	}
 
-	return &ConnectionSignature{
-		Type:       "https://didcomm.org/signature/1.0/ed25519Sha512_single",
-		SignedData: base64.URLEncoding.EncodeToString(concatenateSignData),
-		SignVerKey: base64.URLEncoding.EncodeToString(base58.Decode(pubKey)),
-		Signature:  base64.URLEncoding.EncodeToString(signature),
+	protectedHeaderBytes, err := json.Marshal(jws.ProtectedHeaders)
+	if err != nil {
+		return nil, err
+	}
+
+	return &jwsResponse{
+		Header:    headers,
+		Protected: base64.StdEncoding.EncodeToString(protectedHeaderBytes),
+		Signature: base64.StdEncoding.EncodeToString(jws.Signature()),
 	}, nil
 }
 
@@ -638,17 +684,25 @@ func (ctx *context) handleInboundResponse(response *Response) (stateAction, *con
 		return nil, nil, fmt.Errorf("get connection record: %w", err)
 	}
 
-	conn, err := verifySignature(response.ConnectionSignature, connRecord.RecipientKeys[0])
+	data, err := response.DIDDoc.Fetch()
+
+	jws := &jwsResponse{}
+	err = json.Unmarshal(data, jws)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	connRecord.TheirDID = conn.DID
+	err = verifyJWS(response.DIDDoc.Base64, jws, connRecord.RecipientKeys[0])
+	if err != nil {
+		return nil, nil, err
+	}
 
-	responseDidDoc, err := ctx.resolveDidDocFromConnection(conn)
+	responseDidDoc, err := ctx.resolveDidDocFromAttachment(response.DIDDoc)
 	if err != nil {
 		return nil, nil, fmt.Errorf("resolve did doc from exchange response connection: %w", err)
 	}
+
+	connRecord.TheirDID = responseDidDoc.ID
 
 	destination, err := service.CreateDestination(responseDidDoc)
 	if err != nil {
@@ -670,56 +724,33 @@ func (ctx *context) handleInboundResponse(response *Response) (stateAction, *con
 	}, connRecord, nil
 }
 
-// verifySignature verifies connection signature and returns connection.
-func verifySignature(connSignature *ConnectionSignature, recipientKeys string) (*Connection, error) {
-	sigData, err := base64.URLEncoding.DecodeString(connSignature.SignedData)
+// verifyJWS verifies payload against JSONWebSignature
+func verifyJWS(payload string, jws *jwsResponse, recipientKeys string) error {
+	signature, err := base64.URLEncoding.DecodeString(jws.Signature)
 	if err != nil {
-		return nil, fmt.Errorf("decode signature data: %w", err)
+		return fmt.Errorf("decode signature: %w", err)
 	}
 
-	if len(sigData) == 0 {
-		return nil, fmt.Errorf("missing or invalid signature data")
-	}
-
-	signature, err := base64.URLEncoding.DecodeString(connSignature.Signature)
-	if err != nil {
-		return nil, fmt.Errorf("decode signature: %w", err)
-	}
-
-	// The signature data must be used to verify against the invitation's recipientKeys for continuity.
+	// The payload must be used to verify against the invitation's recipientKeys for continuity.
 	pubKey := base58.Decode(recipientKeys)
 
-	// TODO: Replace with signed attachments issue-626
-	suiteVerifier := ed25519signature2018.NewPublicKeyVerifier()
-	signatureSuite := ed25519signature2018.New(suite.WithVerifier(suiteVerifier))
+	suiteVerifier := jsonwebsignature2020.NewPublicKeyVerifier()
+	signatureSuite := jsonwebsignature2020.New(suite.WithVerifier(suiteVerifier))
+
+	payloadBytes, err := base64.RawStdEncoding.DecodeString(payload)
+	if err != nil {
+		return fmt.Errorf("decode payload: %w", err)
+	}
 
 	err = signatureSuite.Verify(&verifier.PublicKey{
 		Type:  kms.ED25519,
 		Value: pubKey,
-	},
-		sigData, signature)
+	}, payloadBytes, signature)
 	if err != nil {
-		return nil, fmt.Errorf("verify signature: %w", err)
+		return fmt.Errorf("verify signature: %w", err)
 	}
 
-	// trimming the timestamp and delimiter - only taking out connection attribute bytes
-	if len(sigData) <= timestamplen {
-		return nil, fmt.Errorf("missing connection attribute bytes")
-	}
-
-	connBytes := sigData[timestamplen:]
-	conn := &Connection{}
-
-	err = json.Unmarshal(connBytes, conn)
-	if err != nil {
-		return nil, fmt.Errorf("JSON unmarshalling of connection: %w", err)
-	}
-
-	return conn, nil
-}
-
-func getEpochTime() int64 {
-	return time.Now().Unix()
+	return nil
 }
 
 func (ctx *context) getVerKey(invitationID string) (string, error) {

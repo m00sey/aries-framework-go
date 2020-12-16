@@ -21,7 +21,7 @@ const (
 
 // CreateDIDKey creates a did:key ID using the multicodec key fingerprint as per the did:key format spec found at:
 // https://w3c-ccg.github.io/did-method-key/#format.
-func CreateDIDKey(pubKey []byte) (string, string) {
+func 	CreateDIDKey(pubKey []byte) (string, string) {
 	methodID := KeyFingerprint(ed25519pub, pubKey)
 	didKey := fmt.Sprintf("did:key:%s", methodID)
 	keyID := fmt.Sprintf("%s#%s", didKey, methodID)
