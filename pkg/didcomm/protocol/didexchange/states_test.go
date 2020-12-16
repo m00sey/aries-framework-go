@@ -24,6 +24,7 @@ import (
 	"github.com/hyperledger/aries-framework-go/pkg/didcomm/common/service"
 	"github.com/hyperledger/aries-framework-go/pkg/didcomm/protocol/decorator"
 	"github.com/hyperledger/aries-framework-go/pkg/didcomm/protocol/mediator"
+	"github.com/hyperledger/aries-framework-go/pkg/doc/did"
 	diddoc "github.com/hyperledger/aries-framework-go/pkg/doc/did"
 	"github.com/hyperledger/aries-framework-go/pkg/framework/aries/api/vdr"
 	"github.com/hyperledger/aries-framework-go/pkg/kms"
@@ -36,7 +37,6 @@ import (
 	mockstorage "github.com/hyperledger/aries-framework-go/pkg/mock/storage"
 	mockvdr "github.com/hyperledger/aries-framework-go/pkg/mock/vdr"
 	"github.com/hyperledger/aries-framework-go/pkg/store/connection"
-	"github.com/hyperledger/aries-framework-go/pkg/store/did"
 )
 
 func TestNoopState(t *testing.T) {
@@ -603,19 +603,23 @@ func TestCompletedState_Execute(t *testing.T) {
 		kms:             customKMS,
 	}
 	newDIDDoc := createDIDDocWithKey(pubKey)
-	c := &Connection{
-		DID:    newDIDDoc.ID,
-		DIDDoc: newDIDDoc,
-	}
+	newDIDDocBytes, err := newDIDDoc.JSONBytes()
+	require.NoError(t, err)
+	newDID, err := did.Parse(newDIDDoc.ID)
+
 	invitation, err := createMockInvitation(pubKey, ctx)
 	require.NoError(t, err)
-	connectionSignature, err := ctx.prepareConnectionSignature(c, invitation.ID)
+	connectionSignature, err := ctx.prepareJWS(newDIDDocBytes, invitation.ID)
 	require.NoError(t, err)
 
 	response := &Response{
-		Type:                ResponseMsgType,
-		ID:                  randomString(),
-		ConnectionSignature: connectionSignature,
+		Type: ResponseMsgType,
+		ID:   randomString(),
+		DID:  newDID,
+		DIDDoc: decorator.AttachmentData{
+			Base64: base64.RawStdEncoding.EncodeToString(newDIDDocBytes),
+			JWS:    connectionSignature,
+		},
 		Thread: &decorator.Thread{
 			ID: "test",
 		},
@@ -694,7 +698,7 @@ func TestCompletedState_Execute(t *testing.T) {
 		require.Nil(t, followup)
 	})
 	t.Run("execute inbound handle inbound response  error", func(t *testing.T) {
-		response.ConnectionSignature = &ConnectionSignature{}
+		//response. = &ConnectionSignature{}
 		responsePayloadBytes, err := json.Marshal(response)
 		require.NoError(t, err)
 		_, followup, _, err := (&completed{}).ExecuteInbound(&stateMachineMsg{
@@ -704,6 +708,10 @@ func TestCompletedState_Execute(t *testing.T) {
 		require.Contains(t, err.Error(), "handle inbound response")
 		require.Nil(t, followup)
 	})
+}
+
+func addAttachmentDataToDIDDoc(didDoc *did.Doc, payload string) {
+
 }
 
 func TestVerifySignature(t *testing.T) {
@@ -720,23 +728,21 @@ func TestVerifySignature(t *testing.T) {
 		kms:             prov.KMS(),
 	}
 	newDIDDoc := createDIDDocWithKey(pubKey)
-	c := &Connection{
-		DID:    newDIDDoc.ID,
-		DIDDoc: newDIDDoc,
-	}
 	invitation, err := createMockInvitation(pubKey, ctx)
 	require.NoError(t, err)
 
+	newDIDDocBytes, err := newDIDDoc.JSONBytes()
+	require.NoError(t, err)
+
 	t.Run("signature verified", func(t *testing.T) {
-		connectionSignature, err := ctx.prepareConnectionSignature(c, invitation.ID)
+		jws, err := ctx.prepareJWS(newDIDDocBytes, invitation.ID)
 		require.NoError(t, err)
-		con, err := verifySignature(connectionSignature, invitation.RecipientKeys[0])
+		err := verifyJWS(jws, invitation.RecipientKeys[0])
 		require.NoError(t, err)
-		require.NotNil(t, con)
-		require.Equal(t, newDIDDoc.ID, con.DID)
+		//require.Equal(t, newDIDDoc.ID, con.DID)
 	})
 	t.Run("missing/invalid signature data", func(t *testing.T) {
-		con, err := verifySignature(&ConnectionSignature{}, invitation.RecipientKeys[0])
+		con, err := verifyJWS(&ConnectionSignature{}, invitation.RecipientKeys[0])
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "missing or invalid signature data")
 		require.Nil(t, con)
@@ -746,7 +752,7 @@ func TestVerifySignature(t *testing.T) {
 		require.NoError(t, err)
 
 		connectionSignature.SignedData = "invalid-signed-data"
-		con, err := verifySignature(connectionSignature, "")
+		con, err := verifyJWS(connectionSignature, "")
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "decode signature data: illegal base64 data")
 		require.Nil(t, con)
@@ -756,7 +762,7 @@ func TestVerifySignature(t *testing.T) {
 		require.NoError(t, err)
 
 		connectionSignature.Signature = "invalid-signature"
-		con, err := verifySignature(connectionSignature, "")
+		con, err := verifyJWS(connectionSignature, "")
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "decode signature: illegal base64 data")
 		require.Nil(t, con)
@@ -765,7 +771,7 @@ func TestVerifySignature(t *testing.T) {
 		connectionSignature, err := ctx.prepareConnectionSignature(c, invitation.ID)
 		require.NoError(t, err)
 
-		con, err := verifySignature(connectionSignature, "invalid-key")
+		con, err := verifyJWS(connectionSignature, "invalid-key")
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "verify signature: ed25519: invalid key")
 		require.Nil(t, con)
@@ -776,7 +782,7 @@ func TestVerifySignature(t *testing.T) {
 
 		// generate different key and assign it to signature verification key
 		pubKey2 := newED25519Key(t, prov.CustomKMS)
-		con, err := verifySignature(connectionSignature, pubKey2)
+		con, err := verifyJWS(connectionSignature, pubKey2)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "ed25519: invalid signature")
 		require.Nil(t, con)
@@ -807,7 +813,7 @@ func TestVerifySignature(t *testing.T) {
 			Signature:  base64.URLEncoding.EncodeToString(signature),
 		}
 
-		con, err := verifySignature(cs, invitation.RecipientKeys[0])
+		con, err := verifyJWS(cs, invitation.RecipientKeys[0])
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "JSON unmarshalling of connection")
 		require.Nil(t, con)
@@ -835,7 +841,7 @@ func TestVerifySignature(t *testing.T) {
 			Signature:  base64.URLEncoding.EncodeToString(signature),
 		}
 
-		con, err := verifySignature(cs, invitation.RecipientKeys[0])
+		con, err := verifyJWS(cs, invitation.RecipientKeys[0])
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "missing connection attribute bytes")
 		require.Nil(t, con)
@@ -1143,7 +1149,7 @@ func TestGetDIDDocAndConnection(t *testing.T) {
 			vdRegistry:      &mockvdr.MockVDRegistry{ResolveValue: doc},
 			connectionStore: cStore,
 		}
-		didDoc, conn, err := ctx.getDIDDocAndConnection(doc.ID, nil)
+		didDoc, err := ctx.getDIDDoc(doc.ID, nil)
 		require.NoError(t, err)
 		require.NotNil(t, didDoc)
 		require.NotNil(t, conn)
@@ -1153,7 +1159,7 @@ func TestGetDIDDocAndConnection(t *testing.T) {
 		ctx := context{
 			vdRegistry: &mockvdr.MockVDRegistry{ResolveErr: errors.New("resolver error")},
 		}
-		didDoc, conn, err := ctx.getDIDDocAndConnection("did-id", nil)
+		didDoc, err := ctx.getDIDDoc("did-id", nil)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "resolver error")
 		require.Nil(t, didDoc)
@@ -1177,7 +1183,7 @@ func TestGetDIDDocAndConnection(t *testing.T) {
 			vdRegistry:      &mockvdr.MockVDRegistry{ResolveValue: doc},
 			connectionStore: cStore,
 		}
-		didDoc, conn, err := ctx.getDIDDocAndConnection(doc.ID, nil)
+		didDoc, err := ctx.getDIDDoc(doc.ID, nil)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "did error")
 		require.Nil(t, didDoc)
@@ -1188,7 +1194,7 @@ func TestGetDIDDocAndConnection(t *testing.T) {
 			vdRegistry: &mockvdr.MockVDRegistry{CreateErr: errors.New("creator error")},
 			routeSvc:   &mockroute.MockMediatorSvc{},
 		}
-		didDoc, conn, err := ctx.getDIDDocAndConnection("", nil)
+		didDoc, err := ctx.getDIDDoc("", nil)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "creator error")
 		require.Nil(t, didDoc)
@@ -1202,7 +1208,7 @@ func TestGetDIDDocAndConnection(t *testing.T) {
 			connectionStore: connectionStore,
 			routeSvc:        &mockroute.MockMediatorSvc{},
 		}
-		didDoc, conn, err := ctx.getDIDDocAndConnection("", nil)
+		didDoc, err := ctx.getDIDDoc("", nil)
 		require.NoError(t, err)
 		require.NotNil(t, didDoc)
 		require.NotNil(t, conn)
@@ -1225,7 +1231,7 @@ func TestGetDIDDocAndConnection(t *testing.T) {
 			connectionStore: connectionStore,
 			routeSvc:        &mockroute.MockMediatorSvc{},
 		}
-		didDoc, conn, err := ctx.getDIDDocAndConnection("", nil)
+		didDoc, err := ctx.getDIDDoc("", nil)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "did error")
 		require.Nil(t, didDoc)
@@ -1243,7 +1249,7 @@ func TestGetDIDDocAndConnection(t *testing.T) {
 				ConfigErr:   errors.New("router config error"),
 			},
 		}
-		didDoc, conn, err := ctx.getDIDDocAndConnection("", []string{"xyz"})
+		didDoc, err := ctx.getDIDDoc("", []string{"xyz"})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "did doc - fetch router config")
 		require.Nil(t, didDoc)
@@ -1261,7 +1267,7 @@ func TestGetDIDDocAndConnection(t *testing.T) {
 				AddKeyErr:   errors.New("router add key error"),
 			},
 		}
-		didDoc, conn, err := ctx.getDIDDocAndConnection("", []string{"xyz"})
+		didDoc, err := ctx.getDIDDoc("", []string{"xyz"})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "did doc - add key to the router")
 		require.Nil(t, didDoc)
