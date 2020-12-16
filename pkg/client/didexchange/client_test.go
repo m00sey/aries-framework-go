@@ -1116,7 +1116,7 @@ func TestServiceEvents(t *testing.T) {
 
 	// send connection request message
 	id := "valid-thread-id"
-	newDidDoc, err := (&mockvdr.MockVDRegistry{}).Create("test")
+	// newDidDoc, err := (&mockvdr.MockVDRegistry{}).Create("test")
 	require.NoError(t, err)
 
 	invitation, err := c.CreateInvitation("alice")
@@ -1130,10 +1130,11 @@ func TestServiceEvents(t *testing.T) {
 			Thread: &decorator.Thread{
 				PID: invitation.ID,
 			},
-			Connection: &didexchange.Connection{
-				DID:    newDidDoc.ID,
-				DIDDoc: newDidDoc,
-			},
+			DIDDoc: decorator.Attachment{},
+			// Connection: &didexchange.Connection{
+			// 	DID:    newDidDoc.ID,
+			// 	DIDDoc: newDidDoc,
+			// },
 		},
 	)
 	require.NoError(t, err)
@@ -1221,7 +1222,7 @@ func TestAcceptExchangeRequest(t *testing.T) {
 	require.NoError(t, err)
 	// send connection request message
 	id := "valid-thread-id"
-	newDidDoc, err := (&mockvdr.MockVDRegistry{}).Create("test")
+	// newDidDoc, err := (&mockvdr.MockVDRegistry{}).Create("test")
 	require.NoError(t, err)
 
 	request, err := json.Marshal(
@@ -1232,10 +1233,11 @@ func TestAcceptExchangeRequest(t *testing.T) {
 			Thread: &decorator.Thread{
 				PID: invitation.ID,
 			},
-			Connection: &didexchange.Connection{
-				DID:    newDidDoc.ID,
-				DIDDoc: newDidDoc,
-			},
+			DIDDoc: decorator.Attachment{},
+			// Connection: &didexchange.Connection{
+			// 	DID:    newDidDoc.ID,
+			// 	DIDDoc: newDidDoc,
+			// },
 		},
 	)
 	require.NoError(t, err)
