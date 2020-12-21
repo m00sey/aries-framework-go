@@ -205,6 +205,8 @@ func getKeyTemplate(keyType kms.KeyType) (*tinkpb.KeyTemplate, error) {
 		return ecdh.ECDH384KWAES256GCMKeyTemplate(), nil
 	case kms.ECDH521KWAES256GCMType:
 		return ecdh.ECDH521KWAES256GCMKeyTemplate(), nil
+	case kms.JWKType:
+		return createJWK2020KeyTemplate(), nil
 	default:
 		return nil, fmt.Errorf("getKeyTemplate: key type '%s' unrecognized", keyType)
 	}
@@ -224,6 +226,24 @@ func createECDSAIEEE1363KeyTemplate(hashType commonpb.HashType, curve commonpb.E
 		Value:            serializedFormat,
 		OutputPrefixType: tinkpb.OutputPrefixType_RAW,
 	}
+}
+
+func createJWK2020KeyTemplate() *tinkpb.KeyTemplate {
+	//params := &ecdsapb.EcdsaParams{
+	//	HashType: hashType,
+	//	Curve:    curve,
+	//	Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
+	//}
+	//format := &ecdsapb.EcdsaKeyFormat{Params: params}
+	//serializedFormat, _ := proto.Marshal(format) //nolint:errcheck
+	//
+	//return &tinkpb.KeyTemplate{
+	//	TypeUrl:          ecdsaPrivateKeyTypeURL,
+	//	Value:            serializedFormat,
+	//	OutputPrefixType: tinkpb.OutputPrefixType_RAW,
+	//}
+
+	return nil
 }
 
 func (l *LocalKMS) storeKeySet(kh *keyset.Handle, kt kms.KeyType) (string, error) {
