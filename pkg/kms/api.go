@@ -116,6 +116,8 @@ const (
 	ECDH384KWAES256GCM = "ECDH384KWAES256GCM"
 	// ECDH521KWAES256GCM key type value.
 	ECDH521KWAES256GCM = "ECDH521KWAES256GCM"
+	//	JWK ED25519
+	JWK2020 = "JwsVerificationKey2020"
 )
 
 // KeyType represents a key type supported by the KMS.
@@ -160,6 +162,8 @@ const (
 	ECDH384KWAES256GCMType = KeyType(ECDH384KWAES256GCM)
 	// ECDH521KWAES256GCMType key type value.
 	ECDH521KWAES256GCMType = KeyType(ECDH521KWAES256GCM)
+	//	JWKType key type value.
+	JWKType = KeyType(JWK2020)
 )
 
 // CryptoBox is a libsodium crypto service used by legacy authcrypt packer.

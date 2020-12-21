@@ -66,6 +66,7 @@ func NewCompositePublicKeyVerifier(verifiers []SignatureVerifier, opts ...Public
 func (pkv *PublicKeyVerifier) Verify(pubKey *PublicKey, msg, signature []byte) error {
 	if pkv.exactType != "" {
 		if pubKey.Type != pkv.exactType {
+			fmt.Println("public key type: ", pubKey.Type)
 			return fmt.Errorf("a type of public key is not '%s'", pkv.exactType)
 		}
 	}
