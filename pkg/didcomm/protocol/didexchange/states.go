@@ -382,8 +382,8 @@ func (ctx *context) handleInboundInvitation(invitation *Invitation, thid string,
 		DID:   didDoc.ID,
 		DIDDoc: decorator.Attachment{
 			MimeType: "application/json",
-			Data: decorator.AttachmentData{
-				Base64: base64.RawStdEncoding.EncodeToString(didDocBytes),
+			Data: &decorator.AttachmentData{
+				Base64: base64.URLEncoding.EncodeToString(didDocBytes),
 				JWS:    jws,
 			},
 		},
@@ -405,7 +405,7 @@ func (ctx *context) handleInboundInvitation(invitation *Invitation, thid string,
 
 func (ctx *context) handleInboundRequest(request *Request, options *options,
 	connRec *connectionstore.Record) (stateAction, *connectionstore.Record, error) {
-	requestDidDoc, err := ctx.resolveDidDocFromAttachment(request.DIDDoc.Data)
+	requestDidDoc, err := ctx.resolveDidDocFromAttachment(*request.DIDDoc.Data)
 	if err != nil {
 		return nil, nil, fmt.Errorf("resolve did doc from exchange request connection: %w", err)
 	}
@@ -437,8 +437,8 @@ func (ctx *context) handleInboundRequest(request *Request, options *options,
 		DID: responseDidDoc.ID,
 		DIDDoc: decorator.Attachment{
 			MimeType: "application/json",
-			Data: decorator.AttachmentData{
-				Base64: base64.RawStdEncoding.EncodeToString(responseDidDocBytes),
+			Data: &decorator.AttachmentData{
+				Base64: base64.URLEncoding.EncodeToString(responseDidDocBytes),
 				JWS:    jws,
 			}},
 	}
@@ -620,7 +620,6 @@ func (ctx *context) prepareJWS(didDocBytes []byte,
 	if err != nil {
 		return nil, fmt.Errorf("failed to get verkey: %w", err)
 	}
-
 	signingKID, err := localkms.CreateKID(base58.Decode(pubKey), kms.ED25519Type)
 	if err != nil {
 		return nil, fmt.Errorf("prepare	WS: failed to generate KID from public key: %w", err)
@@ -630,13 +629,11 @@ func (ctx *context) prepareJWS(didDocBytes []byte,
 	if err != nil {
 		return nil, fmt.Errorf("prepareJWS: failed to get key handle: %w", err)
 	}
-
 	didKey, _ := fingerprint.CreateDIDKey(base58.Decode(pubKey))
 
 	headers := map[string]interface{}{
 		jose.HeaderKeyID: didKey,
 	}
-
 	//todo - 626 where to derive Algo from
 	protectedHeaders := map[string]interface{}{
 		jose.HeaderAlgorithm: "EdDSA",
@@ -656,8 +653,7 @@ func (ctx *context) prepareJWS(didDocBytes []byte,
 	}
 
 	return &jwsResponse{
-		Header: headers,
-		//TODO change these to URLEncoding?
+		Header:    headers,
 		Protected: base64.URLEncoding.EncodeToString(protectedHeaderBytes),
 		Signature: base64.URLEncoding.EncodeToString(jws.Signature()),
 	}, nil
@@ -696,7 +692,7 @@ func (ctx *context) handleInboundResponse(response *Response) (stateAction, *con
 		return nil, nil, err
 	}
 
-	responseDidDoc, err := ctx.resolveDidDocFromAttachment(response.DIDDoc.Data)
+	responseDidDoc, err := ctx.resolveDidDocFromAttachment(*response.DIDDoc.Data)
 	if err != nil {
 		return nil, nil, fmt.Errorf("resolve did doc from exchange response connection: %w", err)
 	}
@@ -727,7 +723,8 @@ type jwsVerifier struct {
 	pubKey []byte
 }
 
-func (s *jwsVerifier) Verify(joseHeaders jose.Headers, _, signingInput, signature []byte) error {
+// Verify todo
+func (s *jwsVerifier) Verify(joseHeaders jose.Headers, _, payload, signature []byte) error {
 	alg, ok := joseHeaders.Algorithm()
 	if !ok {
 		return errors.New("alg is not defined")
@@ -737,19 +734,38 @@ func (s *jwsVerifier) Verify(joseHeaders jose.Headers, _, signingInput, signatur
 		return errors.New("alg is not EdDSA")
 	}
 
-	sigInput, err := jose.SigningInput(joseHeaders, signingInput)
+	headerBytes, err := json.Marshal(joseHeaders)
 	if err != nil {
-		return errors.New(fmt.Sprintf("failed to generate signing input: %s", err))
-	}
-	if ok := ed25519.Verify(s.pubKey, sigInput, signature); !ok {
-		return errors.New("signature doesn't match")
+		return fmt.Errorf("marshal jose headers: %w", err)
 	}
 
+	hBase64 := true
+
+	if b64, ok := joseHeaders[jose.HeaderB64Payload]; ok {
+		if hBase64, ok = b64.(bool); !ok {
+			return errors.New("invalid b64 header")
+		}
+	}
+
+	headersStr := base64.RawURLEncoding.EncodeToString(headerBytes)
+
+	var payloadStr string
+
+	if hBase64 {
+		payloadStr = base64.RawURLEncoding.EncodeToString(payload)
+	} else {
+		payloadStr = string(payload)
+	}
+
+	if ok := ed25519.Verify(s.pubKey, []byte(fmt.Sprintf("%s.%s", headersStr, payloadStr)), signature); !ok {
+		return errors.New("signature doesn't match")
+	}
 	return nil
 }
 
 // verifyJWS verifies payload against JSONWebSignature
 func verifyJWS(payload string, jws *jwsResponse, recipientKeys string) error {
+	fmt.Println("VERIFY JWS")
 	signature, err := base64.URLEncoding.DecodeString(jws.Signature)
 	if err != nil {
 		return fmt.Errorf("decode signature: %w", err)
@@ -805,7 +821,6 @@ func (ctx *context) getVerKey(invitationID string) (string, error) {
 			return "", fmt.Errorf("get invitation for signature: %w", err)
 		}
 	}
-
 	invPubKey, err := ctx.getInvitationRecipientKey(&invitation)
 	if err != nil {
 		return "", fmt.Errorf("get invitation recipient key: %w", err)
@@ -828,7 +843,6 @@ func (ctx *context) getInvitationRecipientKey(invitation *Invitation) (string, e
 
 		return recKey, nil
 	}
-
 	return invitation.RecipientKeys[0], nil
 }
 
