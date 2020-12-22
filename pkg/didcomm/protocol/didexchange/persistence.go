@@ -27,6 +27,8 @@ func newConnectionStore(p provider) (*connectionStore, error) {
 		return nil, fmt.Errorf("failed to initialize connection recorder: %w", err)
 	}
 
+	fmt.Printf("newConnectionStore StorageProvider: %v", p.StorageProvider())
+
 	didConnStore, err := did.NewConnectionStore(p)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize did connection store: %w", err)

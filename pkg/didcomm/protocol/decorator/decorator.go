@@ -73,7 +73,7 @@ type Attachment struct {
 	// Lets the receiver guess how expensive it will be, in time, bandwidth, and storage, to fully fetch the attachment.
 	ByteCount int64 `json:"byte_count,omitempty"`
 	// Data is a JSON object that gives access to the actual content of the attachment.
-	Data AttachmentData `json:"data,omitempty"`
+	Data *AttachmentData `json:"data,omitempty"`
 }
 
 // AttachmentData contains attachment payload.
@@ -125,7 +125,7 @@ func (d *AttachmentData) Fetch() ([]byte, error) {
 	return nil, errors.New("no contents in this attachment")
 }
 
-// Fetch this attachment's JWS.
+// FetchJWS this attachment's JWS.
 func (d *AttachmentData) FetchJWS() ([]byte, error) {
 	if d.JWS != "" {
 		bits, err := json.Marshal(d.JWS)

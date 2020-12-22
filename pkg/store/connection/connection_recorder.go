@@ -177,7 +177,6 @@ func marshalAndSave(k string, v interface{}, store storage.Store) error {
 	if err != nil {
 		return fmt.Errorf("save connection record: %w", err)
 	}
-
 	return store.Put(k, bytes)
 }
 

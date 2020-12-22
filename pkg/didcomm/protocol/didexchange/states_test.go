@@ -610,7 +610,7 @@ func TestCompletedState_Execute(t *testing.T) {
 		DID:  newDIDDoc.ID,
 		DIDDoc: decorator.Attachment{
 			MimeType: "application/json",
-			Data: decorator.AttachmentData{
+			Data: &decorator.AttachmentData{
 				Base64: base64.URLEncoding.EncodeToString(newDIDDocBytes),
 				JWS:    jws,
 			},
@@ -737,7 +737,7 @@ func TestVerifySignature(t *testing.T) {
 			DID:  newDIDDoc.ID,
 			DIDDoc: decorator.Attachment{
 				MimeType: "application/json",
-				Data: decorator.AttachmentData{
+				Data: &decorator.AttachmentData{
 					Base64: base64.URLEncoding.EncodeToString(newDIDDocBytes),
 					JWS:    jws,
 				},
@@ -1522,7 +1522,7 @@ func createRequest(t *testing.T, ctx *context) (*Request, error) {
 		},
 		DIDDoc: decorator.Attachment{
 			MimeType: "application/json",
-			Data: decorator.AttachmentData{
+			Data: &decorator.AttachmentData{
 				Base64: base64.RawStdEncoding.EncodeToString(didDocBytes),
 			},
 		},
@@ -1565,7 +1565,7 @@ func createResponse(request *Request, ctx *context) (*Response, error) {
 		},
 		DIDDoc: decorator.Attachment{
 			MimeType: "application/json",
-			Data: decorator.AttachmentData{
+			Data: &decorator.AttachmentData{
 				Base64: base64.URLEncoding.EncodeToString(didDocBytes),
 			},
 		},

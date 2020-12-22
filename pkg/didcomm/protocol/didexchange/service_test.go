@@ -9,6 +9,7 @@ package didexchange
 import (
 	"crypto/ed25519"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -20,6 +21,7 @@ import (
 	gojose "github.com/square/go-jose/v3"
 	"github.com/stretchr/testify/require"
 
+	"github.com/hyperledger/aries-framework-go/pkg/crypto/tinkcrypto"
 	"github.com/hyperledger/aries-framework-go/pkg/didcomm/common/model"
 	"github.com/hyperledger/aries-framework-go/pkg/didcomm/common/service"
 	"github.com/hyperledger/aries-framework-go/pkg/didcomm/protocol/decorator"
@@ -772,7 +774,25 @@ func randomString() string {
 }
 
 func TestEventsSuccess(t *testing.T) {
+	k := newKMS(t, mockstorage.NewMockStoreProvider())
+	pubKey := newED25519Key(t, k)
+	id := randomString()
+	invite, err := json.Marshal(
+		&Invitation{
+			Type:          InvitationMsgType,
+			ID:            id,
+			Label:         "test",
+			RecipientKeys: []string{pubKey},
+		},
+	)
+	require.NoError(t, err)
+
+	sp := mockstorage.NewMockStoreProvider()
+	err = sp.Store.Put("inv_"+id, invite)
+	require.NoError(t, err)
+
 	svc, err := New(&protocol.MockProvider{
+		StoreProvider: sp,
 		ServiceMap: map[string]interface{}{
 			mediator.Coordination: &mockroute.MockMediatorSvc{},
 		},
@@ -798,20 +818,6 @@ func TestEventsSuccess(t *testing.T) {
 			}
 		}
 	}()
-
-	sp := mockstorage.NewMockStoreProvider()
-	k := newKMS(t, sp)
-	pubKey := newED25519Key(t, k)
-	id := randomString()
-	invite, err := json.Marshal(
-		&Invitation{
-			Type:          InvitationMsgType,
-			ID:            id,
-			Label:         "test",
-			RecipientKeys: []string{pubKey},
-		},
-	)
-	require.NoError(t, err)
 
 	// send invite
 	didMsg, err := service.ParseDIDCommMsgMap(invite)
@@ -1226,19 +1232,21 @@ func TestRequestRecord(t *testing.T) {
 
 func TestAcceptExchangeRequest(t *testing.T) {
 	sp := mockstorage.NewMockStoreProvider()
-	svc, err := New(&protocol.MockProvider{
+	k := newKMS(t, sp)
+	p := &protocol.MockProvider{
 		StoreProvider: sp,
 		ServiceMap: map[string]interface{}{
 			mediator.Coordination: &mockroute.MockMediatorSvc{},
 		},
-	})
+		CustomKMS: k,
+	}
+	svc, err := New(p)
 	require.NoError(t, err)
 
 	actionCh := make(chan service.DIDCommAction, 10)
 	err = svc.RegisterActionEvent(actionCh)
 	require.NoError(t, err)
 
-	k := newKMS(t, sp)
 	pubKey := newED25519Key(t, k)
 	invitation := &Invitation{
 		Type:            InvitationMsgType,
@@ -1247,6 +1255,8 @@ func TestAcceptExchangeRequest(t *testing.T) {
 		RecipientKeys:   []string{pubKey},
 		ServiceEndpoint: "http://alice.agent.example.com:8081",
 	}
+
+	fmt.Printf("test StorageProvider: %v", p.StorageProvider())
 
 	err = svc.connectionStore.SaveInvitation(invitation.ID, invitation)
 	require.NoError(t, err)
@@ -1273,9 +1283,7 @@ func TestAcceptExchangeRequest(t *testing.T) {
 		}
 	}()
 
-	_, err = svc.HandleInbound(generateRequestMsgPayload(t, &protocol.MockProvider{
-		StoreProvider: mockstorage.NewMockStoreProvider(),
-	}, randomString(), invitation.ID), "", "")
+	_, err = svc.HandleInbound(generateRequestMsgPayload(t, p, randomString(), invitation.ID), "", "")
 	require.NoError(t, err)
 
 	select {
@@ -1748,6 +1756,7 @@ func TestFetchConnectionRecord(t *testing.T) {
 }
 
 func generateRequestMsgPayload(t *testing.T, prov provider, id, invitationID string) service.DIDCommMsg {
+	fmt.Println("test code invoking newConnectionStore")
 	connStore, err := newConnectionStore(prov)
 	require.NoError(t, err)
 	require.NotNil(t, connStore)
@@ -1756,8 +1765,17 @@ func generateRequestMsgPayload(t *testing.T, prov provider, id, invitationID str
 		outboundDispatcher: prov.OutboundDispatcher(),
 		vdRegistry:         &mockvdr.MockVDRegistry{CreateValue: mockdiddoc.GetMockDIDDoc()},
 		connectionStore:    connStore,
+		kms:                prov.KMS(),
+		crypto:             &tinkcrypto.Crypto{},
 	}
-	doc, err := ctx.vdRegistry.Create(testMethod, nil)
+
+	newDIDDoc, err := ctx.vdRegistry.Create(testMethod)
+	require.NoError(t, err)
+
+	newDIDDocBytes, err := newDIDDoc.JSONBytes()
+	require.NoError(t, err)
+
+	jws, err := ctx.prepareJWS(newDIDDocBytes, invitationID)
 	require.NoError(t, err)
 
 	requestBytes, err := json.Marshal(&Request{
@@ -1766,10 +1784,14 @@ func generateRequestMsgPayload(t *testing.T, prov provider, id, invitationID str
 		Thread: &decorator.Thread{
 			PID: invitationID,
 		},
-		//Connection: &Connection{
-		//	DID:    doc.DIDDocument.ID,
-		//	DIDDoc: doc.DIDDocument,
-		//},
+
+		DIDDoc: decorator.Attachment{
+			MimeType: "application/json",
+			Data: &decorator.AttachmentData{
+				Base64: base64.URLEncoding.EncodeToString(newDIDDocBytes),
+				JWS:    jws,
+			},
+		},
 	})
 	require.NoError(t, err)
 
