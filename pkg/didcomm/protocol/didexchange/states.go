@@ -612,8 +612,8 @@ type jwsResponse struct {
 
 // Encode the message and convert to Signed Attachment as per the spec:
 // https://github.com/hyperledger/aries-rfcs/tree/master/features/0023-did-exchange
-func (ctx *context) prepareJWS(didDocBytes []byte,
-	invitationID string) (*jwsResponse, error) {
+func (ctx *context) prepareJWS(didDocBytes []byte, invitationID string) (*jwsResponse, error) {
+	//log.Println("prepareJWS")
 	logger.Debugf("invitationID=%s", invitationID)
 
 	pubKey, err := ctx.getVerKey(invitationID)
@@ -765,6 +765,7 @@ func (s *jwsVerifier) Verify(joseHeaders jose.Headers, _, payload, signature []b
 
 // verifyJWS verifies payload against JSONWebSignature
 func verifyJWS(payload string, jws *jwsResponse, recipientKeys string) error {
+	//log.Println("verifyJWS")
 	signature, err := base64.URLEncoding.DecodeString(jws.Signature)
 	if err != nil {
 		return fmt.Errorf("decode signature: %w", err)

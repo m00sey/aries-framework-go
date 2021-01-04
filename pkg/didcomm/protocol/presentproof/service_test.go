@@ -868,7 +868,7 @@ func TestService_HandleInbound(t *testing.T) {
 		msg := service.NewDIDCommMsgMap(Presentation{
 			Type: PresentationMsgType,
 			PresentationsAttach: []decorator.Attachment{{
-				Data: decorator.AttachmentData{
+				Data: &decorator.AttachmentData{
 					Base64: base64.StdEncoding.EncodeToString([]byte(`{}`)),
 				},
 			}},

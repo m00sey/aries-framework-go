@@ -922,7 +922,7 @@ func TestService_HandleInbound(t *testing.T) {
 		msg := service.NewDIDCommMsgMap(IssueCredential{
 			Type: IssueCredentialMsgType,
 			CredentialsAttach: []decorator.Attachment{
-				{Data: decorator.AttachmentData{JSON: &verifiable.Credential{
+				{Data: &decorator.AttachmentData{JSON: &verifiable.Credential{
 					Context: []string{
 						"https://www.w3.org/2018/credentials/v1",
 						"https://www.w3.org/2018/credentials/examples/v1",

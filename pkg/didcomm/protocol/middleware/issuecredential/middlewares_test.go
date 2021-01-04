@@ -88,7 +88,7 @@ func TestSaveCredentials(t *testing.T) {
 		metadata.EXPECT().Message().Return(service.NewDIDCommMsgMap(issuecredential.IssueCredential{
 			Type: issuecredential.IssueCredentialMsgType,
 			CredentialsAttach: []decorator.Attachment{
-				{Data: decorator.AttachmentData{JSON: struct{ C chan int }{}}},
+				{Data: &decorator.AttachmentData{JSON: struct{ C chan int }{}}},
 			},
 		}))
 
@@ -111,7 +111,7 @@ func TestSaveCredentials(t *testing.T) {
 		metadata.EXPECT().Message().Return(service.NewDIDCommMsgMap(issuecredential.IssueCredential{
 			Type: issuecredential.IssueCredentialMsgType,
 			CredentialsAttach: []decorator.Attachment{
-				{Data: decorator.AttachmentData{JSON: &verifiable.Credential{
+				{Data: &decorator.AttachmentData{JSON: &verifiable.Credential{
 					Context: []string{"https://www.w3.org/2018/credentials/v1"},
 				}}},
 			},
@@ -137,7 +137,7 @@ func TestSaveCredentials(t *testing.T) {
 		metadata.EXPECT().Message().Return(service.NewDIDCommMsgMap(issuecredential.IssueCredential{
 			Type: issuecredential.IssueCredentialMsgType,
 			CredentialsAttach: []decorator.Attachment{
-				{Data: decorator.AttachmentData{JSON: getCredential()}},
+				{Data: &decorator.AttachmentData{JSON: getCredential()}},
 			},
 		}))
 
@@ -159,7 +159,7 @@ func TestSaveCredentials(t *testing.T) {
 		metadata.EXPECT().Message().Return(service.NewDIDCommMsgMap(issuecredential.IssueCredential{
 			Type: issuecredential.IssueCredentialMsgType,
 			CredentialsAttach: []decorator.Attachment{
-				{Data: decorator.AttachmentData{JSON: getCredential()}},
+				{Data: &decorator.AttachmentData{JSON: getCredential()}},
 			},
 		}))
 
@@ -185,7 +185,7 @@ func TestSaveCredentials(t *testing.T) {
 		metadata.EXPECT().Message().Return(service.NewDIDCommMsgMap(issuecredential.IssueCredential{
 			Type: issuecredential.IssueCredentialMsgType,
 			CredentialsAttach: []decorator.Attachment{
-				{Data: decorator.AttachmentData{JSON: getCredential()}},
+				{Data: &decorator.AttachmentData{JSON: getCredential()}},
 			},
 		}))
 
@@ -217,7 +217,7 @@ func TestSaveCredentials(t *testing.T) {
 		metadata.EXPECT().Message().Return(service.NewDIDCommMsgMap(issuecredential.IssueCredential{
 			Type: issuecredential.IssueCredentialMsgType,
 			CredentialsAttach: []decorator.Attachment{
-				{Data: decorator.AttachmentData{JSON: cred}},
+				{Data: &decorator.AttachmentData{JSON: cred}},
 			},
 		}))
 
@@ -286,7 +286,7 @@ func TestSaveCredentials(t *testing.T) {
 		metadata.EXPECT().Message().Return(service.NewDIDCommMsgMap(issuecredential.IssueCredential{
 			Type: issuecredential.IssueCredentialMsgType,
 			CredentialsAttach: []decorator.Attachment{
-				{Data: decorator.AttachmentData{JSON: credential}},
+				{Data: &decorator.AttachmentData{JSON: credential}},
 			},
 		}))
 

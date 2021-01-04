@@ -532,7 +532,7 @@ func base64Attachment(t *testing.T, data interface{}) *decorator.Attachment {
 		MimeType:    uuid.New().String(),
 		LastModTime: time.Now(),
 		ByteCount:   0,
-		Data: decorator.AttachmentData{
+		Data: &decorator.AttachmentData{
 			Base64: base64.StdEncoding.EncodeToString(bytes),
 		},
 	}
