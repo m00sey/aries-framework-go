@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"crypto/ed25519"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -801,6 +802,11 @@ func TestCommand_AcceptExchangeRequest(t *testing.T) {
 		invitation, err := cmd.client.CreateInvitation("test")
 		require.NoError(t, err)
 
+		newDidDocBytes, err := json.Marshal(newDidDoc)
+		require.NoError(t, err)
+
+		newDidDocBase64 := base64.URLEncoding.EncodeToString(newDidDocBytes)
+
 		request, err := json.Marshal(
 			&didexsvc.Request{
 				Type:  didexsvc.RequestMsgType,
@@ -812,7 +818,7 @@ func TestCommand_AcceptExchangeRequest(t *testing.T) {
 				DID: newDidDoc.ID,
 				DIDDoc: decorator.Attachment{
 					Data: &decorator.AttachmentData{
-						Base64: "",
+						Base64: newDidDocBase64,
 					},
 				},
 			},

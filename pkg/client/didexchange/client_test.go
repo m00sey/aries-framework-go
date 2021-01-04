@@ -9,12 +9,15 @@ package didexchange
 import (
 	"crypto/ed25519"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
 	"testing"
 	"time"
+
+	mockvdr "github.com/hyperledger/aries-framework-go/pkg/mock/vdr"
 
 	"github.com/btcsuite/btcutil/base58"
 	"github.com/google/uuid"
@@ -32,7 +35,6 @@ import (
 	mockkms "github.com/hyperledger/aries-framework-go/pkg/mock/kms"
 	mockprovider "github.com/hyperledger/aries-framework-go/pkg/mock/provider"
 	mockstore "github.com/hyperledger/aries-framework-go/pkg/mock/storage"
-	mockvdr "github.com/hyperledger/aries-framework-go/pkg/mock/vdr"
 	"github.com/hyperledger/aries-framework-go/pkg/storage/mem"
 	"github.com/hyperledger/aries-framework-go/pkg/store/connection"
 	"github.com/hyperledger/aries-framework-go/pkg/vdr/peer"
@@ -1139,8 +1141,13 @@ func TestServiceEvents(t *testing.T) {
 
 	// send connection request message
 	id := "valid-thread-id"
-	doc, err := (&mockvdr.MockVDRegistry{}).Create("test", nil)
+	newDidDoc, err := (&mockvdr.MockVDRegistry{}).Create("test")
 	require.NoError(t, err)
+
+	newDidDocBytes, err := json.Marshal(newDidDoc)
+	require.NoError(t, err)
+
+	newDidDocBase64 := base64.URLEncoding.EncodeToString(newDidDocBytes)
 
 	invitation, err := c.CreateInvitation("alice")
 	require.NoError(t, err)
@@ -1153,11 +1160,11 @@ func TestServiceEvents(t *testing.T) {
 			Thread: &decorator.Thread{
 				PID: invitation.ID,
 			},
-			DIDDoc: decorator.Attachment{},
-			// Connection: &didexchange.Connection{
-			// 	DID:    doc.DIDDocument.ID,
-			// 	DIDDoc: doc.DIDDocument,
-			// },
+			DIDDoc: decorator.Attachment{
+				Data: &decorator.AttachmentData{
+					Base64: newDidDocBase64,
+				},
+			},
 		},
 	)
 	require.NoError(t, err)
@@ -1245,9 +1252,13 @@ func TestAcceptExchangeRequest(t *testing.T) {
 	require.NoError(t, err)
 	// send connection request message
 	id := "valid-thread-id"
-	doc, err := (&mockvdr.MockVDRegistry{}).Create("test", nil)
+	newDidDoc, err := (&mockvdr.MockVDRegistry{}).Create("test")
 	require.NoError(t, err)
 
+	newDidDocBytes, err := json.Marshal(newDidDoc)
+	require.NoError(t, err)
+
+	newDidDocBase64 := base64.URLEncoding.EncodeToString(newDidDocBytes)
 	request, err := json.Marshal(
 		&didexchange.Request{
 			Type:  didexchange.RequestMsgType,
@@ -1256,11 +1267,11 @@ func TestAcceptExchangeRequest(t *testing.T) {
 			Thread: &decorator.Thread{
 				PID: invitation.ID,
 			},
-			DIDDoc: decorator.Attachment{},
-			// Connection: &didexchange.Connection{
-			// 	DID:    doc.DIDDocument.ID,
-			// 	DIDDoc: doc.DIDDocument,
-			// },
+			DIDDoc: decorator.Attachment{
+				Data: &decorator.AttachmentData{
+					Base64: newDidDocBase64,
+				},
+			},
 		},
 	)
 	require.NoError(t, err)
@@ -1353,6 +1364,9 @@ func TestAcceptInvitation(t *testing.T) {
 			},
 		)
 		require.NoError(t, jsonErr)
+
+		err = store.Store.Put("inv_abc", invitation)
+		require.NoError(t, err)
 
 		msg, svcErr := service.ParseDIDCommMsgMap(invitation)
 		require.NoError(t, svcErr)

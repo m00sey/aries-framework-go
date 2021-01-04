@@ -89,7 +89,7 @@ func ExampleClient_AcceptRequest() { //nolint:gocyclo,gocognit
 	req, err := router.CreateRequest(
 		[]*decorator.Attachment{{
 			ID: uuid.New().String(),
-			Data: decorator.AttachmentData{
+			Data: &decorator.AttachmentData{
 				Base64: base64.StdEncoding.EncodeToString(routeRequest),
 			},
 		}},

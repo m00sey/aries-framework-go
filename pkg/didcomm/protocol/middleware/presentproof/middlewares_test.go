@@ -97,7 +97,7 @@ func TestSavePresentation(t *testing.T) {
 		metadata.EXPECT().Message().Return(service.NewDIDCommMsgMap(presentproof.Presentation{
 			Type: presentproof.PresentationMsgType,
 			PresentationsAttach: []decorator.Attachment{
-				{Data: decorator.AttachmentData{JSON: struct{ C chan int }{}}},
+				{Data: &decorator.AttachmentData{JSON: struct{ C chan int }{}}},
 			},
 		}))
 
@@ -120,7 +120,7 @@ func TestSavePresentation(t *testing.T) {
 		metadata.EXPECT().Message().Return(service.NewDIDCommMsgMap(presentproof.Presentation{
 			Type: presentproof.PresentationMsgType,
 			PresentationsAttach: []decorator.Attachment{
-				{Data: decorator.AttachmentData{JSON: &verifiable.Presentation{
+				{Data: &decorator.AttachmentData{JSON: &verifiable.Presentation{
 					Context: []string{"https://www.w3.org/2018/presentation/v1"},
 				}}},
 			},
@@ -146,7 +146,7 @@ func TestSavePresentation(t *testing.T) {
 		metadata.EXPECT().Message().Return(service.NewDIDCommMsgMap(presentproof.Presentation{
 			Type: presentproof.PresentationMsgType,
 			PresentationsAttach: []decorator.Attachment{
-				{Data: decorator.AttachmentData{Base64: base64.StdEncoding.EncodeToString([]byte(vpJWS))}},
+				{Data: &decorator.AttachmentData{Base64: base64.StdEncoding.EncodeToString([]byte(vpJWS))}},
 			},
 		}))
 
@@ -172,7 +172,7 @@ func TestSavePresentation(t *testing.T) {
 		metadata.EXPECT().Message().Return(service.NewDIDCommMsgMap(presentproof.Presentation{
 			Type: presentproof.PresentationMsgType,
 			PresentationsAttach: []decorator.Attachment{
-				{Data: decorator.AttachmentData{Base64: base64.StdEncoding.EncodeToString([]byte(vpJWS))}},
+				{Data: &decorator.AttachmentData{Base64: base64.StdEncoding.EncodeToString([]byte(vpJWS))}},
 			},
 		}))
 
@@ -202,7 +202,7 @@ func TestSavePresentation(t *testing.T) {
 		metadata.EXPECT().Message().Return(service.NewDIDCommMsgMap(presentproof.Presentation{
 			Type: presentproof.PresentationMsgType,
 			PresentationsAttach: []decorator.Attachment{
-				{Data: decorator.AttachmentData{Base64: base64.StdEncoding.EncodeToString([]byte(vpJWSNoID))}},
+				{Data: &decorator.AttachmentData{Base64: base64.StdEncoding.EncodeToString([]byte(vpJWSNoID))}},
 			},
 		}))
 
@@ -238,7 +238,7 @@ func TestSavePresentation(t *testing.T) {
 		metadata.EXPECT().Message().Return(service.NewDIDCommMsgMap(presentproof.Presentation{
 			Type: presentproof.PresentationMsgType,
 			PresentationsAttach: []decorator.Attachment{
-				{Data: decorator.AttachmentData{Base64: base64.StdEncoding.EncodeToString([]byte(vpJWS))}},
+				{Data: &decorator.AttachmentData{Base64: base64.StdEncoding.EncodeToString([]byte(vpJWS))}},
 			},
 		}))
 

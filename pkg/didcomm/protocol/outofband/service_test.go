@@ -1136,7 +1136,7 @@ func newRequest() *Request {
 				Description: "test",
 				FileName:    "dont_open_this.exe",
 				MimeType:    "text/plain",
-				Data: decorator.AttachmentData{
+				Data: &decorator.AttachmentData{
 					JSON: map[string]interface{}{
 						"@id":   "123",
 						"@type": "test-type",
