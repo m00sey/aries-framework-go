@@ -272,14 +272,17 @@ func TestInvitedState_Execute(t *testing.T) {
 func TestRequestedState_Execute(t *testing.T) {
 	prov := getProvider(t)
 	// Alice receives an invitation from Bob
-	invitationPayloadBytes, err := json.Marshal(&Invitation{
+
+	pubKey := newED25519Key(t, prov.CustomKMS)
+	invitation := &Invitation{
 		Type:            InvitationMsgType,
 		ID:              randomString(),
 		Label:           "Bob",
-		RecipientKeys:   []string{"8HH5gYEeNc3z7PYXmd54d4x6qAfCNrqQqEB3nS7Zfu7K"},
+		RecipientKeys:   []string{pubKey},
 		ServiceEndpoint: "https://localhost:8090",
 		RoutingKeys:     []string{"8HH5gYEeNc3z7PYXmd54d4x6qAfCNrqQqEB3nS7Zfu7K"},
-	})
+	}
+	invitationPayloadBytes, err := json.Marshal(invitation)
 	require.NoError(t, err)
 	t.Run("rejects messages other than invitations or requests", func(t *testing.T) {
 		others := []service.DIDCommMsg{
@@ -299,6 +302,10 @@ func TestRequestedState_Execute(t *testing.T) {
 		msg, err := service.ParseDIDCommMsgMap(invitationPayloadBytes)
 		require.NoError(t, err)
 		thid, err := msg.ThreadID()
+		require.NoError(t, err)
+
+		err = ctx.connectionStore.SaveInvitation(invitation.ID, invitation)
+
 		require.NoError(t, err)
 		connRec, _, _, e := (&requested{}).ExecuteInbound(&stateMachineMsg{
 			DIDCommMsg: msg,
@@ -1523,14 +1530,9 @@ func createRequest(t *testing.T, ctx *context) (*Request, error) {
 		DIDDoc: decorator.Attachment{
 			MimeType: "application/json",
 			Data: &decorator.AttachmentData{
-				Base64: base64.RawStdEncoding.EncodeToString(didDocBytes),
+				Base64: base64.URLEncoding.EncodeToString(didDocBytes),
 			},
 		},
-
-		//Connection: &Connection{
-		//	DID:    newDidDoc.ID,
-		//	DIDDoc: newDidDoc,
-		//},
 	}
 
 	return request, nil

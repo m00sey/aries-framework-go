@@ -763,7 +763,6 @@ func (s *jwsVerifier) Verify(joseHeaders jose.Headers, _, payload, signature []b
 
 // verifyJWS verifies payload against JSONWebSignature
 func verifyJWS(payload string, jws *jwsResponse, recipientKeys string) error {
-	fmt.Println("VERIFY JWS")
 	signature, err := base64.URLEncoding.DecodeString(jws.Signature)
 	if err != nil {
 		return fmt.Errorf("decode signature: %w", err)
