@@ -201,7 +201,7 @@ func (s *ControllerSteps) acceptRequest(issuer string) error {
 	return postToURL(url+fmt.Sprintf(acceptRequest, piid), issuecredentialcmd.AcceptRequestArgs{
 		IssueCredential: &client.IssueCredential{
 			CredentialsAttach: []decorator.Attachment{
-				{Data: decorator.AttachmentData{JSON: getVCredential()}},
+				{Data: &decorator.AttachmentData{JSON: getVCredential()}},
 			},
 		},
 	})

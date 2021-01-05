@@ -542,7 +542,7 @@ func (a *SDKSteps) newOOBRequest(agentID string, requests ...interface{}) (*outo
 	attachments := []*decorator.Attachment{{
 		ID:          uuid.New().String(),
 		Description: "test",
-		Data: decorator.AttachmentData{
+		Data: &decorator.AttachmentData{
 			JSON: map[string]interface{}{},
 		},
 	}}
@@ -567,7 +567,7 @@ func (a *SDKSteps) newOOBRequest(agentID string, requests ...interface{}) (*outo
 			attachments = append(attachments, &decorator.Attachment{
 				ID:          uuid.New().String(),
 				Description: "test",
-				Data: decorator.AttachmentData{
+				Data: &decorator.AttachmentData{
 					Base64: base64.StdEncoding.EncodeToString(bytes),
 				},
 			})

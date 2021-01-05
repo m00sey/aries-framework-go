@@ -201,7 +201,7 @@ func (b *BDDSteps) routerApprovesIntroduction(router, serviceEndpoint, routingKe
 	req, err := b.context.OutOfBandClients[router].CreateRequest(
 		[]*decorator.Attachment{{
 			Description: "please redeem your route code",
-			Data: decorator.AttachmentData{
+			Data: &decorator.AttachmentData{
 				Base64: base64.StdEncoding.EncodeToString(bits),
 			},
 		}},
@@ -215,7 +215,7 @@ func (b *BDDSteps) routerApprovesIntroduction(router, serviceEndpoint, routingKe
 		req,
 		&decorator.Attachment{
 			Description: "pre-approved routing keys and service endpoints",
-			Data: decorator.AttachmentData{
+			Data: &decorator.AttachmentData{
 				JSON: map[string]interface{}{
 					"routingKeys":     []string{routingKey},
 					"serviceEndpoint": serviceEndpoint,

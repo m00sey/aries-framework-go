@@ -316,7 +316,7 @@ func (s *ControllerSteps) NewRequest(agentID string) (*outofband.Request, error)
 			ID:          uuid.New().String(),
 			Description: "dummy",
 			MimeType:    "text/plain",
-			Data: decorator.AttachmentData{
+			Data: &decorator.AttachmentData{
 				JSON: map[string]interface{}{},
 			},
 		}},
