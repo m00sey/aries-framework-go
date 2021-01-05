@@ -297,7 +297,7 @@ func (sdk *SDKSteps) newRequest(agentID string) (*outofband.Request, error) {
 			ID:          uuid.New().String(),
 			Description: "dummy",
 			MimeType:    "text/plain",
-			Data: decorator.AttachmentData{
+			Data: &decorator.AttachmentData{
 				JSON: map[string]interface{}{},
 			},
 		}},
@@ -393,7 +393,7 @@ func (sdk *SDKSteps) CreateRequestWithDID(agent string) error {
 		[]*decorator.Attachment{{
 			ID:          uuid.New().String(),
 			Description: "bdd test",
-			Data: decorator.AttachmentData{
+			Data: &decorator.AttachmentData{
 				JSON: map[string]interface{}{},
 			},
 		}},

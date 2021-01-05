@@ -236,7 +236,7 @@ func (a *SDKSteps) acceptRequest(agent string) error {
 
 	return a.clients[agent].AcceptRequest(PIID, &issuecredential.IssueCredential{
 		CredentialsAttach: []decorator.Attachment{
-			{Data: decorator.AttachmentData{JSON: getVCredential()}},
+			{Data: &decorator.AttachmentData{JSON: getVCredential()}},
 		},
 	})
 }
