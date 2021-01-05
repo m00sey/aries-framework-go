@@ -1354,21 +1354,20 @@ func TestAcceptInvitation(t *testing.T) {
 		}()
 
 		pubKey, _ := generateKeyPair()
+		invitation := &didexchange.Invitation{
+			Type:          InvitationMsgType,
+			ID:            "abc",
+			Label:         "test",
+			RecipientKeys: []string{pubKey},
+		}
 		// send connection invitation message
-		invitation, jsonErr := json.Marshal(
-			&didexchange.Invitation{
-				Type:          InvitationMsgType,
-				ID:            "abc",
-				Label:         "test",
-				RecipientKeys: []string{pubKey},
-			},
-		)
+		invitationBytes, jsonErr := json.Marshal(invitation)
 		require.NoError(t, jsonErr)
 
-		err = store.Store.Put("inv_abc", invitation)
+		err = store.Store.Put("inv_"+invitation.ID, invitationBytes)
 		require.NoError(t, err)
 
-		msg, svcErr := service.ParseDIDCommMsgMap(invitation)
+		msg, svcErr := service.ParseDIDCommMsgMap(invitationBytes)
 		require.NoError(t, svcErr)
 		_, err = didExSvc.HandleInbound(msg, "", "")
 		require.NoError(t, err)

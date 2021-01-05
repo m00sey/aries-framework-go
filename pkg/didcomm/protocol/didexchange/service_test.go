@@ -1325,37 +1325,6 @@ func TestRequestRecord(t *testing.T) {
 		require.Contains(t, err.Error(), "save connection record")
 	})
 
-	//t.Run("fails if parent thread ID is missing", func(t *testing.T) {
-	//	sp := mockstorage.NewMockStoreProvider()
-	//	prov := &protocol.MockProvider{
-	//		StoreProvider: sp,
-	//		ServiceMap: map[string]interface{}{
-	//			mediator.Coordination: &mockroute.MockMediatorSvc{},
-	//		},
-	//	}
-	//	svc, err := New(prov)
-	//	require.NoError(t, err)
-	//
-	//	k := newKMS(t, sp)
-	//	prov.CustomKMS = k
-	//	pubKey := newED25519Key(t, k)
-	//	invitation := &Invitation{
-	//		Type:            InvitationMsgType,
-	//		ID:              randomString(),
-	//		Label:           "Bob",
-	//		RecipientKeys:   []string{pubKey},
-	//		ServiceEndpoint: "http://alice.agent.example.com:8081",
-	//	}
-	//
-	//	err = svc.connectionStore.SaveInvitation(invitation.ID, invitation)
-	//	require.NoError(t, err)
-	//
-	//	parentThreadID := ""
-	//	didcommMsg := generateRequestMsgPayload(t, prov, randomString(), parentThreadID)
-	//	require.Empty(t, didcommMsg.ParentThreadID())
-	//	_, err = svc.requestMsgRecord(didcommMsg)
-	//	require.Error(t, err)
-	//})
 }
 
 func TestAcceptExchangeRequest(t *testing.T) {
