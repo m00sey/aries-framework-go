@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 
 	"github.com/hyperledger/aries-framework-go/pkg/storage"
 )
@@ -51,6 +52,7 @@ type Recorder struct {
 // TODO should avoid using target of type `interface{}` [Issue #1030].
 func (c *Recorder) SaveInvitation(id string, invitation interface{}) error {
 	if id == "" {
+		log.Println("hihi")
 		return fmt.Errorf(errMsgInvalidKey)
 	}
 
