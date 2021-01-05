@@ -733,6 +733,7 @@ func TestVerifySignature(t *testing.T) {
 	require.NoError(t, err)
 
 	jws, err := ctx.prepareJWS(newDIDDocBytes, invitation.ID)
+
 	t.Run("signature verified", func(t *testing.T) {
 		response := &Response{
 			Type: ResponseMsgType,
@@ -1029,16 +1030,6 @@ func createResponse(request *Request, ctx *context) (*Response, error) {
 		return nil, err
 	}
 
-	//c := &Connection{
-	//	DID:    didDoc.ID,
-	//	DIDDoc: didDoc,
-	//}
-	//
-	//connectionSignature, err := ctx.prepareConnectionSignature(c, request.Thread.PID)
-	//if err != nil {
-	//	return nil, err
-	//}
-
 	response := &Response{
 		Type: ResponseMsgType,
 		ID:   randomString(),
@@ -1051,37 +1042,6 @@ func createResponse(request *Request, ctx *context) (*Response, error) {
 				Base64: base64.URLEncoding.EncodeToString(didDocBytes),
 			},
 		},
-	}
-
-	return response, nil
-}
-
-func saveMockConnectionRecord(t *testing.T, request *Request, ctx *context) (*Response, error) {
-	t.Helper()
-
-	response, err := createResponse(request, ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	pubKey := newED25519Key(t, ctx.kms)
-	connRec := &connection.Record{
-		State:         (&responded{}).Name(),
-		ThreadID:      response.Thread.ID,
-		ConnectionID:  "123",
-		InvitationID:  request.Thread.PID,
-		RecipientKeys: []string{pubKey},
-	}
-
-	err = ctx.connectionStore.saveConnectionRecord(connRec)
-	if err != nil {
-		return nil, err
-	}
-
-	err = ctx.connectionStore.SaveNamespaceThreadID(response.Thread.ID, findNamespace(ResponseMsgType),
-		connRec.ConnectionID)
-	if err != nil {
-		return nil, err
 	}
 
 	return response, nil

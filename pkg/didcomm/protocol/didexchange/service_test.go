@@ -1324,7 +1324,6 @@ func TestRequestRecord(t *testing.T) {
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "save connection record")
 	})
-
 }
 
 func TestAcceptExchangeRequest(t *testing.T) {
