@@ -49,7 +49,6 @@ const (
 	ackStatusOK        = "ok"
 	didCommServiceType = "did-communication"
 	didMethod          = "peer"
-	timestamplen       = 8
 )
 
 var errVerKeyNotFound = errors.New("verkey not found")
@@ -109,8 +108,7 @@ func stateFromName(name string) (state, error) {
 	}
 }
 
-type noOp struct {
-}
+type noOp struct{}
 
 func (s *noOp) Name() string {
 	return stateNameNoop
@@ -126,8 +124,7 @@ func (s *noOp) ExecuteInbound(_ *stateMachineMsg, thid string, ctx *context) (*c
 }
 
 // null state.
-type null struct {
-}
+type null struct{}
 
 func (s *null) Name() string {
 	return stateNameNull
@@ -143,8 +140,7 @@ func (s *null) ExecuteInbound(msg *stateMachineMsg, thid string, ctx *context) (
 }
 
 // invited state.
-type invited struct {
-}
+type invited struct{}
 
 func (s *invited) Name() string {
 	return StateIDInvited
@@ -164,8 +160,7 @@ func (s *invited) ExecuteInbound(msg *stateMachineMsg, _ string, _ *context) (*c
 }
 
 // requested state.
-type requested struct {
-}
+type requested struct{}
 
 func (s *requested) Name() string {
 	return StateIDRequested
@@ -207,8 +202,7 @@ func (s *requested) ExecuteInbound(msg *stateMachineMsg, thid string, ctx *conte
 }
 
 // responded state.
-type responded struct {
-}
+type responded struct{}
 
 func (s *responded) Name() string {
 	return StateIDResponded
@@ -243,8 +237,7 @@ func (s *responded) ExecuteInbound(msg *stateMachineMsg, thid string, ctx *conte
 }
 
 // completed state.
-type completed struct {
-}
+type completed struct{}
 
 func (s *completed) Name() string {
 	return StateIDCompleted
@@ -280,8 +273,7 @@ func (s *completed) ExecuteInbound(msg *stateMachineMsg, thid string, ctx *conte
 }
 
 // abandoned state.
-type abandoned struct {
-}
+type abandoned struct{}
 
 func (s *abandoned) Name() string {
 	return StateIDAbandoned
@@ -405,7 +397,7 @@ func (ctx *context) handleInboundInvitation(invitation *Invitation, thid string,
 
 func (ctx *context) handleInboundRequest(request *Request, options *options,
 	connRec *connectionstore.Record) (stateAction, *connectionstore.Record, error) {
-	requestDidDoc, err := ctx.resolveDidDocFromAttachment(*request.DIDDoc.Data)
+	requestDidDoc, err := ctx.resolveDidDocFromAttachment(request.DIDDoc.Data)
 	if err != nil {
 		return nil, nil, fmt.Errorf("resolve did doc from exchange request connection: %w", err)
 	}
@@ -440,7 +432,8 @@ func (ctx *context) handleInboundRequest(request *Request, options *options,
 			Data: &decorator.AttachmentData{
 				Base64: base64.URLEncoding.EncodeToString(responseDidDocBytes),
 				JWS:    jws,
-			}},
+			},
+		},
 	}
 
 	connRec.TheirDID = requestDidDoc.ID
@@ -568,7 +561,7 @@ func (ctx *context) getDIDDoc(pubDID string, routerConnections []string) (*did.D
 	return newDidDoc, nil
 }
 
-func (ctx *context) resolveDidDocFromAttachment(attach decorator.AttachmentData) (*did.Doc, error) {
+func (ctx *context) resolveDidDocFromAttachment(attach *decorator.AttachmentData) (*did.Doc, error) {
 	d, err := attach.Fetch()
 	if err != nil {
 		return nil, fmt.Errorf("extracting did_doc~attach data failed: %s", err)
@@ -594,12 +587,12 @@ type jwsSigner struct {
 	headers   map[string]interface{}
 }
 
-// Headers to match jose Signer interface
+// Headers to match jose Signer interface.
 func (s jwsSigner) Headers() jose.Headers {
 	return s.headers
 }
 
-// Sign to match jose Signer interface
+// Sign to match jose Signer interface.
 func (s jwsSigner) Sign(data []byte) ([]byte, error) {
 	return s.crypto.Sign(data, s.keyHandle)
 }
@@ -613,13 +606,13 @@ type jwsResponse struct {
 // Encode the message and convert to Signed Attachment as per the spec:
 // https://github.com/hyperledger/aries-rfcs/tree/master/features/0023-did-exchange
 func (ctx *context) prepareJWS(didDocBytes []byte, invitationID string) (*jwsResponse, error) {
-	//log.Println("prepareJWS")
 	logger.Debugf("invitationID=%s", invitationID)
 
 	pubKey, err := ctx.getVerKey(invitationID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get verkey: %w", err)
 	}
+
 	signingKID, err := localkms.CreateKID(base58.Decode(pubKey), kms.ED25519Type)
 	if err != nil {
 		return nil, fmt.Errorf("prepare	WS: failed to generate KID from public key: %w", err)
@@ -629,12 +622,13 @@ func (ctx *context) prepareJWS(didDocBytes []byte, invitationID string) (*jwsRes
 	if err != nil {
 		return nil, fmt.Errorf("prepareJWS: failed to get key handle: %w", err)
 	}
+
 	didKey, _ := fingerprint.CreateDIDKey(base58.Decode(pubKey))
 
 	headers := map[string]interface{}{
 		jose.HeaderKeyID: didKey,
 	}
-	//todo - 626 where to derive Algo from
+
 	protectedHeaders := map[string]interface{}{
 		jose.HeaderAlgorithm: "EdDSA",
 	}
@@ -642,7 +636,8 @@ func (ctx *context) prepareJWS(didDocBytes []byte, invitationID string) (*jwsRes
 	jws, err := jose.NewJWS(protectedHeaders, headers, didDocBytes, jwsSigner{
 		keyHandle: kh,
 		crypto:    ctx.crypto,
-		headers:   protectedHeaders})
+		headers:   protectedHeaders,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -680,8 +675,12 @@ func (ctx *context) handleInboundResponse(response *Response) (stateAction, *con
 	}
 
 	data, err := response.DIDDoc.Data.FetchJWS()
+	if err != nil {
+		return nil, nil, err
+	}
 
 	jws := &jwsResponse{}
+
 	err = json.Unmarshal(data, jws)
 	if err != nil {
 		return nil, nil, err
@@ -692,7 +691,7 @@ func (ctx *context) handleInboundResponse(response *Response) (stateAction, *con
 		return nil, nil, err
 	}
 
-	responseDidDoc, err := ctx.resolveDidDocFromAttachment(*response.DIDDoc.Data)
+	responseDidDoc, err := ctx.resolveDidDocFromAttachment(response.DIDDoc.Data)
 	if err != nil {
 		return nil, nil, fmt.Errorf("resolve did doc from exchange response connection: %w", err)
 	}
@@ -714,16 +713,14 @@ func (ctx *context) handleInboundResponse(response *Response) (stateAction, *con
 		return nil, nil, fmt.Errorf("handle inbound response: %w", err)
 	}
 
-	return func() error {
-		return ctx.outboundDispatcher.Send(ack, recKey, destination)
-	}, connRecord, nil
+	return func() error { return ctx.outboundDispatcher.Send(ack, recKey, destination) }, connRecord, nil
 }
 
 type jwsVerifier struct {
 	pubKey []byte
 }
 
-// Verify todo
+// Verify will verify a signature.
 func (s *jwsVerifier) Verify(joseHeaders jose.Headers, _, payload, signature []byte) error {
 	alg, ok := joseHeaders.Algorithm()
 	if !ok {
@@ -760,12 +757,12 @@ func (s *jwsVerifier) Verify(joseHeaders jose.Headers, _, payload, signature []b
 	if ok := ed25519.Verify(s.pubKey, []byte(fmt.Sprintf("%s.%s", headersStr, payloadStr)), signature); !ok {
 		return errors.New("signature doesn't match")
 	}
+
 	return nil
 }
 
-// verifyJWS verifies payload against JSONWebSignature
+// verifyJWS verifies payload against JSONWebSignature.
 func verifyJWS(payload string, jws *jwsResponse, recipientKeys string) error {
-	//log.Println("verifyJWS")
 	signature, err := base64.URLEncoding.DecodeString(jws.Signature)
 	if err != nil {
 		return fmt.Errorf("decode signature: %w", err)
@@ -789,6 +786,7 @@ func verifyJWS(payload string, jws *jwsResponse, recipientKeys string) error {
 	}
 
 	protectedHeaders := make(map[string]interface{})
+
 	err = json.Unmarshal(protectedHeaderBytes, &protectedHeaders)
 	if err != nil {
 		return fmt.Errorf("unmarshal protected headers: %w", err)
@@ -821,6 +819,7 @@ func (ctx *context) getVerKey(invitationID string) (string, error) {
 			return "", fmt.Errorf("get invitation for signature: %w", err)
 		}
 	}
+
 	invPubKey, err := ctx.getInvitationRecipientKey(&invitation)
 	if err != nil {
 		return "", fmt.Errorf("get invitation recipient key: %w", err)
@@ -843,6 +842,7 @@ func (ctx *context) getInvitationRecipientKey(invitation *Invitation) (string, e
 
 		return recKey, nil
 	}
+
 	return invitation.RecipientKeys[0], nil
 }
 

@@ -96,7 +96,7 @@ func TestServiceNew(t *testing.T) {
 	})
 }
 
-//did-exchange flow with role Inviter.
+// did-exchange flow with role Inviter.
 func TestService_Handle_Inviter(t *testing.T) {
 	mockStore := &mockstorage.MockStore{Store: make(map[string][]byte)}
 	storeProv := mockstorage.NewCustomMockStoreProvider(mockStore)
@@ -365,14 +365,14 @@ func TestService_Handle_Invitee(t *testing.T) {
 	// Bob replies with a Response
 	payloadBytes, err = json.Marshal(
 		&Response{
-			Type:                ResponseMsgType,
-			ID:                  randomString(),
-			DID: newDidDoc.ID,
+			Type: ResponseMsgType,
+			ID:   randomString(),
+			DID:  newDidDoc.ID,
 			DIDDoc: decorator.Attachment{
 				MimeType: "application/json",
 				Data: &decorator.AttachmentData{
 					Base64: base64.URLEncoding.EncodeToString(newDIDDocBytes),
-					JWS: jws,
+					JWS:    jws,
 				},
 			},
 			Thread: &decorator.Thread{
@@ -451,7 +451,7 @@ func TestService_Handle_EdgeCases(t *testing.T) {
 		sp := mockstorage.NewMockStoreProvider()
 		protocolStateStore := &mockstorage.MockStore{Store: make(map[string][]byte), ErrPut: errors.New("db error")}
 		prov := &protocol.MockProvider{
-			StoreProvider: sp,
+			StoreProvider:              sp,
 			ProtocolStateStoreProvider: mockstorage.NewCustomMockStoreProvider(protocolStateStore),
 			ServiceMap: map[string]interface{}{
 				mediator.Coordination: &mockroute.MockMediatorSvc{},
@@ -1320,7 +1320,6 @@ func TestRequestRecord(t *testing.T) {
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "save connection record")
 	})
-
 }
 
 func TestAcceptExchangeRequest(t *testing.T) {
@@ -1918,12 +1917,12 @@ func TestService_CreateImplicitInvitation(t *testing.T) {
 		require.NotNil(t, cStore)
 
 		ctx := &context{
-			kms: k,
+			kms:                k,
 			outboundDispatcher: prov.OutboundDispatcher(),
 			vdRegistry:         &mockvdr.MockVDRegistry{ResolveValue: newDIDDoc},
 			connectionStore:    cStore,
 			routeSvc:           routeSvc,
-			crypto: &tinkcrypto.Crypto{},
+			crypto:             &tinkcrypto.Crypto{},
 		}
 
 		s, err := New(prov)
