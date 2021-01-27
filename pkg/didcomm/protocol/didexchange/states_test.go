@@ -23,8 +23,8 @@ import (
 	"github.com/hyperledger/aries-framework-go/pkg/didcomm/protocol/decorator"
 	"github.com/hyperledger/aries-framework-go/pkg/didcomm/protocol/mediator"
 	diddoc "github.com/hyperledger/aries-framework-go/pkg/doc/did"
-	vdrapi "github.com/hyperledger/aries-framework-go/pkg/doc/jose"
-	"github.com/hyperledger/aries-framework-go/pkg/framework/aries/api/vdr"
+	"github.com/hyperledger/aries-framework-go/pkg/doc/jose"
+	vdrapi "github.com/hyperledger/aries-framework-go/pkg/framework/aries/api/vdr"
 	"github.com/hyperledger/aries-framework-go/pkg/kms"
 	mockdispatcher "github.com/hyperledger/aries-framework-go/pkg/mock/didcomm/dispatcher"
 	"github.com/hyperledger/aries-framework-go/pkg/mock/didcomm/protocol"
@@ -1020,12 +1020,12 @@ func createRequest(t *testing.T, ctx *context) (*Request, error) {
 }
 
 func createResponse(request *Request, ctx *context) (*Response, error) {
-	doc, err := ctx.vdRegistry.Create(testMethod, nil)
+	docResolution, err := ctx.vdRegistry.Create(testMethod, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	didDocBytes, err := json.Marshal(didDoc)
+	didDocBytes, err := json.Marshal(docResolution.DIDDocument)
 	if err != nil {
 		return nil, err
 	}

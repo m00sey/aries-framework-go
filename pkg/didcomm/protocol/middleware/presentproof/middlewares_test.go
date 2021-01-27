@@ -327,7 +327,7 @@ func TestPresentationDefinition(t *testing.T) {
 			Type: presentproof.RequestPresentationMsgType,
 			RequestPresentationsAttach: []decorator.Attachment{{
 				ID: ID,
-				Data: decorator.AttachmentData{
+				Data: &decorator.AttachmentData{
 					Base64: "ew==",
 				},
 			}},
@@ -345,7 +345,7 @@ func TestPresentationDefinition(t *testing.T) {
 		metadata.EXPECT().Presentation().Return(&presentproof.Presentation{
 			PresentationsAttach: []decorator.Attachment{{
 				MimeType: mimeTypeApplicationLdJSON,
-				Data: decorator.AttachmentData{
+				Data: &decorator.AttachmentData{
 					JSON: &verifiable.Credential{
 						ID: uuid.New().String(),
 						Schemas: []verifiable.TypedID{{
@@ -367,7 +367,7 @@ func TestPresentationDefinition(t *testing.T) {
 			Type: presentproof.RequestPresentationMsgType,
 			RequestPresentationsAttach: []decorator.Attachment{{
 				ID: ID,
-				Data: decorator.AttachmentData{
+				Data: &decorator.AttachmentData{
 					JSON: map[string]interface{}{
 						"presentation_definition": &presexch.PresentationDefinition{
 							ID: uuid.New().String(),
@@ -404,7 +404,7 @@ func TestPresentationDefinition(t *testing.T) {
 		metadata.EXPECT().Presentation().Return(&presentproof.Presentation{
 			PresentationsAttach: []decorator.Attachment{{
 				MimeType: mimeTypeApplicationLdJSON,
-				Data: decorator.AttachmentData{
+				Data: &decorator.AttachmentData{
 					JSON: &verifiable.Credential{
 						ID:      "http://example.edu/credentials/1872",
 						Context: []string{"https://www.w3.org/2018/credentials/v1"},
@@ -429,7 +429,7 @@ func TestPresentationDefinition(t *testing.T) {
 				},
 			}, {
 				MimeType: "application/json",
-				Data: decorator.AttachmentData{
+				Data: &decorator.AttachmentData{
 					JSON: map[string]struct{}{},
 				},
 			}},
@@ -442,7 +442,7 @@ func TestPresentationDefinition(t *testing.T) {
 			Type: presentproof.RequestPresentationMsgType,
 			RequestPresentationsAttach: []decorator.Attachment{{
 				ID: ID,
-				Data: decorator.AttachmentData{
+				Data: &decorator.AttachmentData{
 					JSON: map[string]interface{}{
 						"presentation_definition": &presexch.PresentationDefinition{
 							ID: uuid.New().String(),

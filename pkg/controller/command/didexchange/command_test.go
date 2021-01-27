@@ -796,13 +796,13 @@ func TestCommand_AcceptExchangeRequest(t *testing.T) {
 
 		// send connection request message
 		id := "valid-thread-id"
-		didDoc, err := (&mockvdr.MockVDRegistry{}).Create("peer", nil)
+		didResolution, err := (&mockvdr.MockVDRegistry{}).Create("peer", nil)
 		require.NoError(t, err)
 
 		invitation, err := cmd.client.CreateInvitation("test")
 		require.NoError(t, err)
 
-		newDidDocBytes, err := json.Marshal(newDidDoc)
+		newDidDocBytes, err := json.Marshal(didResolution.DIDDocument)
 		require.NoError(t, err)
 
 		newDidDocBase64 := base64.URLEncoding.EncodeToString(newDidDocBytes)
@@ -815,7 +815,7 @@ func TestCommand_AcceptExchangeRequest(t *testing.T) {
 				Thread: &decorator.Thread{
 					PID: invitation.ID,
 				},
-				DID: newDidDoc.ID,
+				DID: didResolution.DIDDocument.ID,
 				DIDDoc: decorator.Attachment{
 					Data: &decorator.AttachmentData{
 						Base64: newDidDocBase64,

@@ -17,8 +17,6 @@ import (
 	"testing"
 	"time"
 
-	mockvdr "github.com/hyperledger/aries-framework-go/pkg/mock/vdr"
-
 	"github.com/btcsuite/btcutil/base58"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -1142,10 +1140,10 @@ func TestServiceEvents(t *testing.T) {
 
 	// send connection request message
 	id := "valid-thread-id"
-	newDidDoc, err := (&mockvdr.MockVDRegistry{}).Create("test")
+	docResolution, err := (&mockvdr.MockVDRegistry{}).Create("test", nil)
 	require.NoError(t, err)
 
-	newDidDocBytes, err := json.Marshal(newDidDoc)
+	newDidDocBytes, err := json.Marshal(docResolution)
 	require.NoError(t, err)
 
 	newDidDocBase64 := base64.URLEncoding.EncodeToString(newDidDocBytes)
@@ -1253,10 +1251,10 @@ func TestAcceptExchangeRequest(t *testing.T) {
 	require.NoError(t, err)
 	// send connection request message
 	id := "valid-thread-id"
-	newDidDoc, err := (&mockvdr.MockVDRegistry{}).Create("test")
+	docResolution, err := (&mockvdr.MockVDRegistry{}).Create("test", nil)
 	require.NoError(t, err)
 
-	newDidDocBytes, err := json.Marshal(newDidDoc)
+	newDidDocBytes, err := json.Marshal(docResolution)
 	require.NoError(t, err)
 
 	newDidDocBase64 := base64.URLEncoding.EncodeToString(newDidDocBytes)

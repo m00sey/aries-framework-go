@@ -154,7 +154,7 @@ func PresentationDefinition(p Provider) presentproof.Middleware {
 				metadata.Presentation().PresentationsAttach, decorator.Attachment{
 					ID:       uuid.New().String(),
 					MimeType: mimeTypeApplicationLdJSON,
-					Data:     decorator.AttachmentData{JSON: presentation},
+					Data:     &decorator.AttachmentData{JSON: presentation},
 				})
 
 			return next.Handle(metadata)

@@ -27,7 +27,6 @@ import (
 	"github.com/hyperledger/aries-framework-go/pkg/didcomm/protocol/decorator"
 	"github.com/hyperledger/aries-framework-go/pkg/didcomm/protocol/mediator"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/did"
-	"github.com/hyperledger/aries-framework-go/pkg/doc/jose"
 	vdrapi "github.com/hyperledger/aries-framework-go/pkg/framework/aries/api/vdr"
 	"github.com/hyperledger/aries-framework-go/pkg/kms"
 	"github.com/hyperledger/aries-framework-go/pkg/kms/localkms"
@@ -124,7 +123,7 @@ func TestService_Handle_Inviter(t *testing.T) {
 		kms:                k,
 	}
 
-	newDidDoc, err := ctx.vdRegistry.Create(testMethod)
+	docResolution, err := ctx.vdRegistry.Create(testMethod, nil)
 	require.NoError(t, err)
 
 	s, err := New(prov)
@@ -158,7 +157,7 @@ func TestService_Handle_Inviter(t *testing.T) {
 
 	thid := randomString()
 
-	didDocBytes, err := json.Marshal(newDidDoc)
+	didDocBytes, err := json.Marshal(docResolution)
 	require.NoError(t, err)
 
 	// Invitation was previously sent by Alice to Bob.
@@ -181,7 +180,7 @@ func TestService_Handle_Inviter(t *testing.T) {
 	require.NoError(t, err)
 	msg, err := service.ParseDIDCommMsgMap(payloadBytes)
 	require.NoError(t, err)
-	_, err = s.HandleInbound(msg, newDidDoc.ID, "")
+	_, err = s.HandleInbound(msg, docResolution.DIDDocument.ID, "")
 	require.NoError(t, err)
 
 	select {
@@ -203,7 +202,7 @@ func TestService_Handle_Inviter(t *testing.T) {
 	didMsg, err := service.ParseDIDCommMsgMap(payloadBytes)
 	require.NoError(t, err)
 
-	_, err = s.HandleInbound(didMsg, newDidDoc.ID, "theirDID")
+	_, err = s.HandleInbound(didMsg, docResolution.DIDDocument.ID, "theirDID")
 	require.NoError(t, err)
 
 	select {
@@ -301,13 +300,13 @@ func TestService_Handle_Invitee(t *testing.T) {
 		kms:                k,
 	}
 
-	newDidDoc, err := ctx.vdRegistry.Create(testMethod)
+	docResolution, err := ctx.vdRegistry.Create(testMethod, nil)
 	require.NoError(t, err)
 
 	s, err := New(prov)
 	require.NoError(t, err)
 
-	s.ctx.vdRegistry = &mockvdr.MockVDRegistry{ResolveValue: newDidDoc}
+	s.ctx.vdRegistry = &mockvdr.MockVDRegistry{ResolveValue: docResolution.DIDDocument}
 	actionCh := make(chan service.DIDCommAction, 10)
 	err = s.RegisterActionEvent(actionCh)
 	require.NoError(t, err)
@@ -358,7 +357,7 @@ func TestService_Handle_Invitee(t *testing.T) {
 	require.Equal(t, invitation.RecipientKeys, connRecord.RecipientKeys)
 	require.Equal(t, invitation.ServiceEndpoint, connRecord.ServiceEndPoint)
 
-	newDIDDocBytes, err := newDidDoc.JSONBytes()
+	newDIDDocBytes, err := docResolution.JSONBytes()
 	require.NoError(t, err)
 
 	jws, err := ctx.prepareJWS(newDIDDocBytes, invitation.ID)
@@ -369,7 +368,7 @@ func TestService_Handle_Invitee(t *testing.T) {
 		&Response{
 			Type: ResponseMsgType,
 			ID:   randomString(),
-			DID:  newDidDoc.ID,
+			DID:  docResolution.DIDDocument.ID,
 			DIDDoc: decorator.Attachment{
 				MimeType: "application/json",
 				Data: &decorator.AttachmentData{
@@ -519,7 +518,7 @@ func TestService_Handle_EdgeCases(t *testing.T) {
 		require.NotNil(t, svc.connectionStore)
 		require.NoError(t, err)
 
-		newDidDoc, err := svc.ctx.vdRegistry.Create("sidetree")
+		newDidDoc, err := svc.ctx.vdRegistry.Create("sidetree", nil)
 		require.NoError(t, err)
 
 		didDocBytes, err := json.Marshal(newDidDoc)
@@ -1870,7 +1869,7 @@ func generateRequestMsgPayload(t *testing.T, prov provider, id, invitationID str
 		crypto:             &tinkcrypto.Crypto{},
 	}
 
-	newDIDDoc, err := ctx.vdRegistry.Create(testMethod)
+	newDIDDoc, err := ctx.vdRegistry.Create(testMethod, nil)
 	require.NoError(t, err)
 
 	newDIDDocBytes, err := newDIDDoc.JSONBytes()
